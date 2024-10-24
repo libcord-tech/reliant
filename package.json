@@ -4,7 +4,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "sass": "^1.77.4",
-    "typescript": "^5.4.5"
+    "typescript": "^5.6.3"
   },
   "scripts": {
     "build:css": "sass --no-source-map src/css/sakura-mainpage.scss build/css/mainpage-modern.css && sass --no-source-map src/css/sakura-prep.scss build/css/prep-modern.css",
