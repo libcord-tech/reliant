@@ -1,5 +1,4 @@
-(async () =>
-{
+(async () => {
     /* Every button with class "ajaxbutton" indicates that the button makes a request to
      * the NS server. The "makeAjaxQuery" function will disable these buttons when a request
      * starts and will only be re-enabled once a complete response has been received from the
@@ -141,6 +140,93 @@
 </html>
 `;
 
+    // Initiate SSE connection
+    const raiderJp = await getStorageValue('raiderjp');
+    // const eventSource = new EventSource(`/api/move+member+endo+region:${raiderJp}`);
+
+    // Types for our event data
+    interface EventData {
+        str: string;
+    }
+
+// Interface for our event patterns
+    interface EventPattern {
+        regex: RegExp;
+        format: (matches: RegExpMatchArray) => string;
+    }
+
+// Event patterns configuration
+    const eventPatterns: Record<string, EventPattern> = {
+        RELOCATION: {
+            regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
+            format: (matches) => formatLink(matches[1], 'nation') +
+                ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`
+        },
+        ADMISSION: {
+            regex: /@@([^@]+)@@ was admitted to the World Assembly/,
+            format: (matches) => `${formatLink(matches[1], 'nation')} was admitted to the World Assembly`
+        },
+        ENDORSEMENT: {
+            regex: /@@([^@]+)@@ endorsed @@([^@]+)@@/,
+            format: (matches) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`
+        },
+        WITHDRAW_ENDORSEMENT: {
+            regex: /@@([^@]+)@@ withdrew its endorsement from @@([^@]+)@@/,
+            format: (matches) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`
+        }
+    };
+
+// Helper function to create links
+    const formatLink = (text: string, type: 'nation' | 'region'): string => {
+        return `<a href="/${type}=${text}">${text}</a>`;
+    };
+
+// Helper function to append report
+    const appendReport = (content: string): void => {
+        const reportsElement = document.querySelector('#reports');
+        if (reportsElement) {
+            reportsElement.innerHTML += `<li>${content}</li>`;
+        }
+    };
+
+// Main event handler
+    const handleEventMessage = (event: MessageEvent): void => {
+        try {
+            const data = JSON.parse(event.data) as EventData;
+
+            // Try each pattern until we find a match
+            for (const pattern of Object.values(eventPatterns)) {
+                const match = data.str.match(pattern.regex);
+                if (match) {
+                    appendReport(pattern.format(match));
+                    return;
+                }
+            }
+
+            // Log unmatched patterns for debugging
+            console.log('Unmatched event:', data.str);
+        } catch (error) {
+            console.error('Error processing event:', error);
+        }
+    };
+
+// Set up event source
+    let eventSource: EventSource;
+    if (typeof EventSource !== 'undefined') {
+        eventSource = new EventSource(`/api/move+member+endo+region:${raiderJp}`);
+        eventSource.onmessage = handleEventMessage;
+    } else {
+        console.error('EventSource is not supported in this browser');
+    }
+
+    eventSource.onopen = () => {
+        console.log('SSE connection opened');
+    }
+
+    eventSource.onerror = () => {
+        console.error('SSE connection error');
+    }
+
     document.open();
     document.write(pageContent);
     document.close();
@@ -182,8 +268,7 @@
      * Helpers
      */
 
-    async function manualLocalIdUpdate(e: MouseEvent): Promise<void>
-    {
+    async function manualLocalIdUpdate(e: MouseEvent): Promise<void> {
         freshlyAdmitted = false;
         console.log('manually updating localid');
         let response = await makeAjaxQuery('/region=rwby', 'GET');
@@ -194,8 +279,7 @@
         (document.querySelector('#chasing-button') as HTMLInputElement).value = 'Refresh';
     }
 
-    async function manualChkUpdate(e: MouseEvent): Promise<void>
-    {
+    async function manualChkUpdate(e: MouseEvent): Promise<void> {
         let response = await makeAjaxQuery('/page=un', 'GET');
         getChk(response);
         // while we're getting the chk, we may as well check the current nation too
@@ -207,10 +291,8 @@
      * Event Handlers
      */
 
-    function resignWA(e: MouseEvent): void
-    {
-        chrome.storage.local.get('chk', async (result) =>
-        {
+    function resignWA(e: MouseEvent): void {
+        chrome.storage.local.get('chk', async (result) => {
             const chk = result.chk;
             let formData = new FormData();
             formData.set('action', 'leave_UN');
@@ -226,10 +308,8 @@
         });
     }
 
-    function admitWA(e: MouseEvent): void
-    {
-        chrome.storage.local.get('switchers', async (result) =>
-        {
+    function admitWA(e: MouseEvent): void {
+        chrome.storage.local.get('switchers', async (result) => {
             // storedswitchers is a list of nation, appid objects
             (document.querySelector('#chasing-button') as HTMLInputElement).value = 'Refresh';
             (document.querySelector('#move-to-jp') as HTMLInputElement).value = 'Move to JP';
@@ -254,8 +334,7 @@
                 chrome.storage.local.set({'currentwa': storedSwitchers[0].name});
                 getChk(response);
                 storedSwitchers.shift();
-            }
-            else if (response.indexOf('Another WA member nation is currently using the same email address') !== -1)
+            } else if (response.indexOf('Another WA member nation is currently using the same email address') !== -1)
                 status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (nation already in WA).`;
             else {
                 status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (invalid application).`;
@@ -265,13 +344,11 @@
         });
     }
 
-    function refreshEndorse(e: MouseEvent): void
-    {
+    function refreshEndorse(e: MouseEvent): void {
         const jpHappenings = document.querySelector('#jp-happenings');
         nationsToEndorse.innerHTML = '';
         jpHappenings.innerHTML = '';
-        chrome.storage.local.get(['jumppoint', 'endorsehappeningscount', 'currentwa', 'endorsekeywords'], async (result) =>
-        {
+        chrome.storage.local.get(['jumppoint', 'endorsehappeningscount', 'currentwa', 'endorsekeywords'], async (result) => {
             let endorseKeywords: string[] = [];
             if (result.endorsekeywords)
                 endorseKeywords = result.endorsekeywords;
@@ -317,13 +394,10 @@
                 if (endorseKeywords.length &&
                     (endorseKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
-                }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                } else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
-                        function onEndorseClick(e: MouseEvent)
-                        {
-                            chrome.storage.local.get('localid', async (localidresult) =>
-                            {
+                        function onEndorseClick(e: MouseEvent) {
+                            chrome.storage.local.get('localid', async (localidresult) => {
                                 if ((e.target as HTMLInputElement).getAttribute('data-updatedlocalid') === '1') {
                                     const localId = localidresult.localid;
                                     let formData = new FormData();
@@ -334,20 +408,17 @@
                                     if (endorseResponse.indexOf('Failed security check.') !== -1) {
                                         status.innerHTML = `Failed to endorse ${nationName}.`;
                                         (e.target as HTMLInputElement).setAttribute('data-updatedlocalid', '0');
-                                    }
-                                    else if (endorseResponse.indexOf('Both nations must reside in the same region') !== -1) {
+                                    } else if (endorseResponse.indexOf('Both nations must reside in the same region') !== -1) {
                                         status.innerHTML = `Failed to endorse ${nationName} (different region).`;
                                         (e.target as HTMLInputElement).setAttribute('data-clicked', '1');
                                         (e.target as HTMLInputElement).parentElement.removeChild(e.target as HTMLInputElement);
-                                    }
-                                    else {
+                                    } else {
                                         (e.target as HTMLInputElement).setAttribute('data-clicked', '1');
                                         status.innerHTML = `Endorsed ${nationName}.`;
                                         nationsEndorsed.push(nationName);
                                         (e.target as HTMLInputElement).parentElement.removeChild(e.target as HTMLInputElement);
                                     }
-                                }
-                                else {
+                                } else {
                                     (document.querySelector('#update-localid') as HTMLInputElement).click();
                                     (e.target as HTMLInputElement).setAttribute('data-updatedlocalid', '1');
                                 }
@@ -371,13 +442,11 @@
         });
     }
 
-    function refreshDossier(e: MouseEvent): void
-    {
+    function refreshDossier(e: MouseEvent): void {
         const raiderHappenings = document.querySelector('#raider-happenings');
         raiderHappenings.innerHTML = '';
         nationsToDossier.innerHTML = '';
-        chrome.storage.local.get(['raiderjp', 'dossierhappeningscount', 'dossierkeywords'], async (result) =>
-        {
+        chrome.storage.local.get(['raiderjp', 'dossierhappeningscount', 'dossierkeywords'], async (result) => {
             let dossierKeywords: string[] = [];
             if (result.dossierkeywords)
                 dossierKeywords = result.dossierkeywords;
@@ -419,16 +488,12 @@
                 if (dossierKeywords.length &&
                     (dossierKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
-                }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                } else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
-                        async function onDossierClick(e: MouseEvent): Promise<void>
-                        {
+                        async function onDossierClick(e: MouseEvent): Promise<void> {
                             (e.target as HTMLInputElement).setAttribute('data-clicked', '1');
-                            const chk: string = await new Promise(resolve =>
-                            {
-                                chrome.storage.local.get('chk', (result) =>
-                                {
+                            const chk: string = await new Promise(resolve => {
+                                chrome.storage.local.get('chk', (result) => {
                                     resolve(result.chk);
                                 });
                             });
@@ -441,8 +506,7 @@
                                 status.innerHTML = `Dossiered ${nationName}`;
                                 nationsDossiered.push(nationName);
                                 (e.target as HTMLInputElement).parentElement.removeChild(e.target as HTMLInputElement);
-                            }
-                            else
+                            } else
                                 status.innerHTML = `Failed to dossier ${nationName}.`;
                         }
 
@@ -462,21 +526,17 @@
         });
     }
 
-    function setRaiderJP(e: MouseEvent): void
-    {
+    function setRaiderJP(e: MouseEvent): void {
         const newRaiderJP = canonicalize((document.querySelector('#raider-jp') as HTMLInputElement).value);
         chrome.storage.local.set({'raiderjp': newRaiderJP});
         notyf.success(`Set raider JP to ${newRaiderJP}`);
         (document.querySelector('#raider-jp') as HTMLInputElement).value = '';
     }
 
-    function moveToJP(e: MouseEvent): void
-    {
+    function moveToJP(e: MouseEvent): void {
         if ((e.target as HTMLInputElement).value == 'Move to JP') {
-            chrome.storage.local.get('localid', (localidresult) =>
-            {
-                chrome.storage.local.get('jumppoint', async (jumppointresult) =>
-                {
+            chrome.storage.local.get('localid', (localidresult) => {
+                chrome.storage.local.get('jumppoint', async (jumppointresult) => {
                     const localId = localidresult.localid;
                     const moveRegion = jumppointresult.jumppoint;
                     let formData = new FormData();
@@ -493,14 +553,17 @@
                     (e.target as HTMLInputElement).value = 'Update Localid';
                 });
             });
-        }
-        else if ((e.target as HTMLInputElement).value == 'Update Localid') {
+        } else if ((e.target as HTMLInputElement).value == 'Update Localid') {
             manualLocalIdUpdate(e);
             (e.target as HTMLInputElement).value = 'Move to JP';
         }
     }
 
-    async function chasingButton(e: MouseEvent): Promise<void>
+    async function chasingButton(e: MouseEvent): Promise<void> {
+
+    }
+
+    /*async function chasingButton(e: MouseEvent): Promise<void>
     {
         // jump points and such
         const doNotMove: string[] = await new Promise((resolve, reject) =>
@@ -593,18 +656,16 @@
             manualLocalIdUpdate(e);
             (e.target as HTMLInputElement).value = 'Refresh';
         }
-    }
+    }*/
 
-    async function updateRegionStatus(e: MouseEvent): Promise<void>
-    {
+    async function updateRegionStatus(e: MouseEvent): Promise<void> {
         if (currentRegion.innerHTML == 'N/A')
             return;
         const nationRegex: RegExp = new RegExp('nation=([A-Za-z0-9_-]+)');
         let response = await makeAjaxQuery(`/template-overall=none/region=${currentRegion.innerHTML}`, 'GET');
         const responseDocument = document.createRange().createContextualFragment(response);
         // update the region happenings at the same time to not make an extra query
-        chrome.storage.local.get('regionhappeningscount', (result) =>
-        {
+        chrome.storage.local.get('regionhappeningscount', (result) => {
             let regionHappeningsCount: number = Number(result.regionhappeningscount) || 10;
             let regionHappeningsLis = responseDocument.querySelectorAll('ul > li');
             regionHappenings.innerHTML = '';
@@ -634,18 +695,15 @@
         document.querySelector('#last-wa-update').innerHTML = lastWaUpdate;
     }
 
-    async function checkCurrentRegion(e: MouseEvent): Promise<void>
-    {
+    async function checkCurrentRegion(e: MouseEvent): Promise<void> {
         let response = await makeAjaxQuery('/region=artificial_solar_system', 'GET');
         let responseElement = document.createRange().createContextualFragment(response);
         let regionHref = (responseElement.querySelector('#panelregionbar > a') as HTMLAnchorElement).href;
         currentRegion.innerHTML = new RegExp('region=([A-Za-z0-9_]+)').exec(regionHref)[1];
     }
 
-    async function endorseDelegate(e: MouseEvent): Promise<void>
-    {
-        chrome.storage.local.get('localid', async (localidresult) =>
-        {
+    async function endorseDelegate(e: MouseEvent): Promise<void> {
+        chrome.storage.local.get('localid', async (localidresult) => {
             const nationName = (document.querySelector('#delegate-nation') as HTMLInputElement).value;
             if (nationName === 'N/A')
                 return;
@@ -662,8 +720,7 @@
         });
     }
 
-    async function checkIfUpdated(e: MouseEvent): Promise<void>
-    {
+    async function checkIfUpdated(e: MouseEvent): Promise<void> {
         didIUpdate.innerHTML = '';
         let responseDiv = document.createElement('div');
         responseDiv.innerHTML = await makeAjaxQuery('/page=ajax2/a=reports/view=self/filter=change', 'GET');
@@ -684,15 +741,13 @@
         }
     }
 
-    async function updateWorldHappenings(e: MouseEvent): Promise<void>
-    {
+    async function updateWorldHappenings(e: MouseEvent): Promise<void> {
         worldHappenings.innerHTML = '';
         let response: string = await makeAjaxQuery('/page=ajax2/a=reports/view=world/filter=move+member+endo', 'GET');
         let responseElement: DocumentFragment = document.createRange().createContextualFragment(response);
         let lis = responseElement.querySelectorAll('li');
         // max 10
-        chrome.storage.local.get('worldhappeningscount', (result) =>
-        {
+        chrome.storage.local.get('worldhappeningscount', (result) => {
             let maxHappeningsCount = Number(result.worldhappeningscount) || 10;
             for (let i = 0; i < maxHappeningsCount; i++) {
                 let liAnchors = lis[i].querySelectorAll('a');
@@ -710,8 +765,7 @@
         });
     }
 
-    function copyWin(e: MouseEvent): void
-    {
+    function copyWin(e: MouseEvent): void {
         // https://hackernoon.com/copying-text-to-clipboard-with-javascript-df4d4988697f
         let copyText = document.createElement('textarea');
         copyText.value = `W: https://www.nationstates.net/region=${currentRegion.innerHTML}`;
@@ -721,8 +775,7 @@
         document.body.removeChild(copyText);
     }
 
-    function copyOrders(e: MouseEvent): void
-    {
+    function copyOrders(e: MouseEvent): void {
         // https://hackernoon.com/copying-text-to-clipboard-with-javascript-df4d4988697f
         let copyText = document.createElement('textarea');
         const delegateNation: string = (document.querySelector('#delegate-nation') as HTMLInputElement).value;
@@ -738,22 +791,19 @@
         document.body.removeChild(copyText);
     }
 
-    function openRegion(e: MouseEvent): void
-    {
+    function openRegion(e: MouseEvent): void {
         const regionUrl = document.querySelector('#current-region').innerHTML;
         window.open(`/region=${regionUrl}`);
     }
 
 // Update the list of switchers as soon as a new WA admit page is opened
-    function onStorageChange(changes: object): void
-    {
+    function onStorageChange(changes: object): void {
         for (let key in changes) {
             let storageChange = changes[key];
             if (key === 'switchers') {
                 const newSwitchers: Switcher[] = storageChange.newValue;
                 (document.querySelector('#num-switchers') as HTMLSpanElement).innerHTML = String(newSwitchers.length);
-            }
-            else if (key === 'currentwa')
+            } else if (key === 'currentwa')
                 currentWANation.innerHTML = storageChange.newValue || 'N/A';
         }
     }
@@ -786,13 +836,13 @@
      * Initialization
      */
 
-    chrome.storage.local.get(['switchers', 'currentwa'], (result) =>
-    {
+    chrome.storage.local.get(['switchers', 'currentwa'], (result) => {
         try {
             document.querySelector('#num-switchers').innerHTML = result.switchers.length as string;
-        } catch(e) {
+        } catch (e) {
             // no wa links in storage, do nothing
-            if (e instanceof TypeError) {}
+            if (e instanceof TypeError) {
+            }
         }
 
         currentWANation.innerHTML = result.currentwa || 'N/A';
