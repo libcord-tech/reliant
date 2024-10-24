@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Reliant",
+  "name": "Reliant NS3",
   "version": "3.0.8",
   "description": "Ease of defending in NationStates military gameplay.",
   "author": "Haku",
@@ -16,7 +16,7 @@
     "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
-    "https://*.nationstates.net/*",
+    "https://*.nationstates3.net/*",
     "https://mail.google.com/*"
   ],
   "background": {
@@ -34,10 +34,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.nationstates.net/*"
+        "https://*.nationstates3.net/*"
       ],
       "exclude_matches": [
-        "https://forum.nationstates.net/*"
+        "https://forum.nationstates3.net/*"
       ],
       "run_at": "document_end",
       "js": [
@@ -46,7 +46,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/*"
+        "https://*.nationstates3.net/*"
       ],
       "run_at": "document_end",
       "js": [
@@ -58,7 +58,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/page=blank/reliant=settings"
+        "https://*.nationstates3.net/page=blank/reliant=settings"
       ],
       "run_at": "document_end",
       "js": [
@@ -67,7 +67,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/template-overall=none/page=blank/reliant=main"
+        "https://*.nationstates3.net/template-overall=none/page=blank/reliant=main"
       ],
       "run_at": "document_end",
       "js": [
@@ -88,7 +88,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/page=join_WA?*"
+        "https://*.nationstates3.net/page=join_WA?*"
       ],
       "run_at": "document_end",
       "js": [
@@ -97,7 +97,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/page=ajax2*"
+        "https://*.nationstates3.net/page=ajax2*"
       ],
       "run_at": "document_end",
       "js": [
@@ -106,7 +106,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/template-overall=none/page=blank/reliant=prep"
+        "https://*.nationstates3.net/template-overall=none/page=blank/reliant=prep"
       ],
       "run_at": "document_end",
       "js": [
@@ -118,9 +118,9 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/region=*",
-        "https://*.nationstates.net/*/region=*",
-        "https://*.nationstates.net/region=*/*"
+        "https://*.nationstates3.net/region=*",
+        "https://*.nationstates3.net/*/region=*",
+        "https://*.nationstates3.net/region=*/*"
       ],
       "run_at": "document_end",
       "js": [
@@ -129,7 +129,7 @@
     },
     {
       "matches": [
-        "https://*.nationstates.net/nation=*"
+        "https://*.nationstates3.net/nation=*"
       ],
       "run_at": "document_end",
       "js": [
