@@ -146,6 +146,8 @@
 
     // Types for our event data
     interface EventData {
+        time: string;
+        id: string;
         str: string;
     }
 
