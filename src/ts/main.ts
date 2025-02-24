@@ -38,6 +38,19 @@ function formatApiString(inputString: string): string {
     });
 }
 
+function parseApiHappenings(xmlHappenings: string): string[]
+{
+    // Parse the XML string into a document
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlHappenings, "application/xml");
+
+    // Extract all <TEXT> elements
+    const textElements = xmlDoc.getElementsByTagName("TEXT");
+
+    // Convert the HTMLCollection to an array and extract the text content
+    return Array.from(textElements).map(elem => elem.textContent);
+}
+
 async function getStorageValue(key: string): Promise<any>
 {
     return new Promise((resolve, reject) =>

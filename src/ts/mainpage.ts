@@ -526,44 +526,35 @@
                 dossierKeywords = result.dossierkeywords;
             const maxHappeningsCount = Number(result.dossierhappeningscount) || 10;
             const raiderJp = result.raiderjp;
-            let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${raiderJp}/filter=move+member+endo`,
-                'GET');
-            const nationNameRegex = new RegExp('nation=([A-Za-z0-9_-]+)');
-            // only so we can use queryselector on the response DOM rather than using regex matching
-            let div = document.createElement('div');
-            div.innerHTML = response;
-            let lis = div.querySelectorAll('li');
+            // let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${raiderJp}/filter=move+member+endo`,
+            //     'GET');
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`);
+            const apiText = await apiResponse.text();
+            const happenings = parseApiHappenings(apiText);
+            const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
+
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != lis.length; i++) {
+            for (let i = 0; i != happenings.length; i++) {
                 // update the raider jp happenings at the same time so we don't have to make an extra query (max 10)
                 if (happeningsAdded < maxHappeningsCount) {
-                    let liAnchors = lis[i].querySelectorAll('a');
-                    let images = lis[i].querySelectorAll('img');
-                    // fix link
-                    for (let j = 0; j != liAnchors.length; j++)
-                        liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                    // make images smaller
-                    for (let j = 0; j != images.length; j++) {
-                        images[j].width = 12;
-                        images[j].height = 12;
-                    }
-                    raiderHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                    raiderHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec((lis[i].querySelector('a:nth-of-type(1)') as HTMLAnchorElement).href);
+                const nationNameMatch = nationNameRegex.exec(happenings[i]);
                 const nationName = nationNameMatch[1];
+                console.log(nationName);
                 // don't let us dossier the same nation twice
                 if (nationsTracked.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (lis[i].innerHTML.indexOf('resigned from') !== -1)
+                if (happenings[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 if (dossierKeywords.length &&
                     (dossierKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                else if (happenings[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         async function onDossierClick(e: MouseEvent): Promise<void>
                         {
