@@ -880,21 +880,24 @@
     async function checkIfUpdated(e: MouseEvent): Promise<void>
     {
         didIUpdate.innerHTML = '';
-        let responseDiv = document.createElement('div');
-        responseDiv.innerHTML = await makeAjaxQuery('/page=ajax2/a=reports/view=self/filter=change', 'GET');
-        let lis = responseDiv.querySelectorAll('li');
+        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`);
+        const xml = await response.text();
+        // Parse the XML string into a document
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xml, "application/xml");
+
+        // Extract all <TEXT> elements
+        const textElements = xmlDoc.getElementsByTagName("TEXT");
+
+        // Convert the HTMLCollection to an array and extract the text content
+        const texts = Array.from(textElements).map(elem => elem.textContent);
+
         // limit to max 5 happenings to save space
         for (let i = 0; i != 3; i++) {
-            if (typeof lis[i] === 'undefined')
+            if (typeof texts[i] === 'undefined')
                 break;
             else {
-                // resize image
-                let images = lis[i].querySelectorAll('img');
-                for (let j = 0; j != images.length; j++) {
-                    images[j].width = 12;
-                    images[j].height = 12;
-                }
-                didIUpdate.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                didIUpdate.innerHTML += `<li>${formatApiString(texts[i])}</li>`;
             }
         }
     }

@@ -15,6 +15,29 @@ interface Switcher
  * Helpers
  */
 
+function formatApiNation(nation: string): string
+{
+    let output = nation.replaceAll('@@', '');
+    return `<a href='/nation=${output}'>${output}</a>`;
+}
+
+function formatApiRegion(region: string): string
+{
+    let output = region.replaceAll('%%', '');
+    return `<a href='/region=${output}'>${output}</a>`;
+}
+
+function formatApiString(inputString: string): string {
+    return inputString.replace(/(@@.*?@@|%%.*?%%)/g, (match) => {
+        if (match.startsWith('@@')) {
+            return formatApiNation(match);
+        } else if (match.startsWith('%%')) {
+            return formatApiRegion(match);
+        }
+        return match;
+    });
+}
+
 async function getStorageValue(key: string): Promise<any>
 {
     return new Promise((resolve, reject) =>

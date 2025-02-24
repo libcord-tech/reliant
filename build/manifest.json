@@ -41,6 +41,7 @@
       ],
       "run_at": "document_end",
       "js": [
+        "js/api-helper.js",
         "js/main.js"
       ]
     },
