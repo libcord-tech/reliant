@@ -418,8 +418,7 @@
                 endorseKeywords = result.endorsekeywords;
             const maxHappeningsCount = Number(result.endorsehappeningscount) || 10;
             const jumpPoint = result.jumppoint || 'artificial_solar_system';
-            // let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${jumpPoint}/filter=move+member+endo`,
-            //     'GET');
+
             const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`);
             const apiText = await apiResponse.text();
             const happenings = parseApiHappenings(apiText);
@@ -517,8 +516,7 @@
                 dossierKeywords = result.dossierkeywords;
             const maxHappeningsCount = Number(result.dossierhappeningscount) || 10;
             const raiderJp = result.raiderjp;
-            // let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${raiderJp}/filter=move+member+endo`,
-            //     'GET');
+
             const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`);
             const apiText = await apiResponse.text();
             const happenings = parseApiHappenings(apiText);
@@ -887,8 +885,6 @@
     async function updateWorldHappenings(e: MouseEvent): Promise<void>
     {
         worldHappenings.innerHTML = '';
-        // let response: string = await makeAjaxQuery('/page=ajax2/a=reports/view=world/filter=move+member+endo', 'GET');
-        // let responseElement: DocumentFragment = document.createRange().createContextualFragment(response);
         const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo');
         const happenings = parseApiHappenings(await response.text());
 
