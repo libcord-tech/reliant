@@ -887,25 +887,17 @@
     async function updateWorldHappenings(e: MouseEvent): Promise<void>
     {
         worldHappenings.innerHTML = '';
-        let response: string = await makeAjaxQuery('/page=ajax2/a=reports/view=world/filter=move+member+endo', 'GET');
-        let responseElement: DocumentFragment = document.createRange().createContextualFragment(response);
-        let lis = responseElement.querySelectorAll('li');
+        // let response: string = await makeAjaxQuery('/page=ajax2/a=reports/view=world/filter=move+member+endo', 'GET');
+        // let responseElement: DocumentFragment = document.createRange().createContextualFragment(response);
+        const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo');
+        const happenings = parseApiHappenings(await response.text());
+
         // max 10
         chrome.storage.local.get('worldhappeningscount', (result) =>
         {
             let maxHappeningsCount = Number(result.worldhappeningscount) || 10;
             for (let i = 0; i < maxHappeningsCount; i++) {
-                let liAnchors = lis[i].querySelectorAll('a');
-                const images = lis[i].querySelectorAll('img');
-                // fix link
-                for (let j = 0; j != liAnchors.length; j++)
-                    liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                // make images smaller
-                for (let j = 0; j != images.length; j++) {
-                    images[j].width = 12;
-                    images[j].height = 12;
-                }
-                worldHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                worldHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
             }
         });
     }
