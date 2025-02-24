@@ -211,7 +211,7 @@
         if (reportsElement) {
             const liElement = document.createElement('li');
             liElement.innerHTML = content;
-            reportsElement.appendChild(liElement);
+            reportsElement.prepend(liElement);
             return liElement;
         }
     };
