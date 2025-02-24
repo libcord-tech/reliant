@@ -238,26 +238,28 @@
                 });
             });
         }
-        let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${currentRegionName}/filter=move+member+endo`,
-            'GET');
-        const nationNameRegex = new RegExp('nation=([A-Za-z0-9_-]+)');
-        // only so we can use queryselector on the response DOM rather than using regex matching
-        let responseElement = document.createRange().createContextualFragment(response);
-        let lis = responseElement.querySelectorAll('li');
+
+        const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${currentRegionName};filter=move+member+endo`);
+        const apiText = await apiResponse.text();
+        const happeningsObject = parseApiHappenings(apiText);
+        const happeningsText = happeningsObject.text;
+        const happeningsTimeStamps = happeningsObject.timestamps;
+        const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
+
         let resigned: string[] = [];
-        for (let i = 0; i != lis.length; i++) {
-            const nationNameMatch = nationNameRegex.exec((lis[i].querySelector('a:nth-of-type(1)') as HTMLAnchorElement).href);
+        for (let i = 0; i != happeningsText.length; i++) {
+            const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
             const nationName = nationNameMatch[1];
             // don't allow us to endorse ourself
             if (canonicalize(nationName) === canonicalize(currentNation))
                 resigned.push(nationName);
             // Don't include nations that probably aren't in the WA
-            if (lis[i].innerHTML.indexOf('resigned from') !== -1)
+            if (happeningsText[i].indexOf('resigned from') !== -1)
                 resigned.push(nationName);
             // don't let us endorse the same nation twice
             else if (nationsEndorsed.indexOf(nationName) !== -1)
                 resigned.push(nationName);
-            else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+            else if (happeningsText[i].indexOf('was admitted') !== -1) {
                 if (resigned.indexOf(nationName) === -1) {
                     function onEndorseClick(e: MouseEvent) {
                         chrome.storage.local.get('localid', async (localidresult) => {

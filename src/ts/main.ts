@@ -15,6 +15,70 @@ interface Switcher
  * Helpers
  */
 
+function formatApiNation(nation: string): string
+{
+    let output = nation.replaceAll('@@', '');
+    return `<a href='/nation=${output}'>${output}</a>`;
+}
+
+function formatApiRegion(region: string): string
+{
+    let output = region.replaceAll('%%', '');
+    return `<a href='/region=${output}'>${output}</a>`;
+}
+
+function formatApiString(inputString: string): string {
+    return inputString.replace(/(@@.*?@@|%%.*?%%)/g, (match) => {
+        if (match.startsWith('@@')) {
+            return formatApiNation(match);
+        } else if (match.startsWith('%%')) {
+            return formatApiRegion(match);
+        }
+        return match;
+    });
+}
+
+function timeAgo(unixTimestamp: number): string {
+    const now = Date.now();
+    const providedTime = unixTimestamp * 1000; // Convert to milliseconds
+    const difference = Math.floor((now - providedTime) / 1000); // Difference in seconds
+
+    if (difference <= 59) {
+        return 'Seconds ago';
+    } else if (difference < 3600) {
+        const minutes = Math.floor(difference / 60);
+        return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    } else {
+        const hours = Math.floor(difference / 3600);
+        return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    }
+}
+
+interface HappeningsResponse
+{
+    text: string[];
+    timestamps: number[];
+}
+
+function parseApiHappenings(xmlHappenings: string): HappeningsResponse
+{
+    // Parse the XML string into a document
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlHappenings, "application/xml");
+
+    // Extract all <TEXT> elements
+    const textElements = xmlDoc.getElementsByTagName("TEXT");
+
+    // Extract all <TIMESTAMP> elements
+    const timestampElements = xmlDoc.getElementsByTagName("TIMESTAMP");
+
+    // Convert the HTMLCollection to an array and extract the text content
+    return {
+        text: Array.from(textElements).map(elem => elem.textContent),
+        timestamps: Array.from(timestampElements).map(elem => Number(elem.textContent))
+    };
+}
+
 async function getStorageValue(key: string): Promise<any>
 {
     return new Promise((resolve, reject) =>

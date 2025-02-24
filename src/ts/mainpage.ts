@@ -418,33 +418,25 @@
                 endorseKeywords = result.endorsekeywords;
             const maxHappeningsCount = Number(result.endorsehappeningscount) || 10;
             const jumpPoint = result.jumppoint || 'artificial_solar_system';
-            let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${jumpPoint}/filter=move+member+endo`,
-                'GET');
-            const nationNameRegex = new RegExp('nation=([A-Za-z0-9_-]+)');
-            // only so we can use queryselector on the response DOM rather than using regex matching
-            let div = document.createElement('div');
-            div.innerHTML = response;
-            let lis = div.querySelectorAll('li');
+
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`);
+            const apiText = await apiResponse.text();
+            const happeningsObject = parseApiHappenings(apiText);
+            const happeningsText = happeningsObject.text;
+            const happeningsTimeStamps = happeningsObject.timestamps;
+            const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
+
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != lis.length; i++) {
+            for (let i = 0; i != happeningsText.length; i++) {
                 // update the jp happenings at the same time so we don't have to make an extra query
                 if (happeningsAdded < maxHappeningsCount) {
-                    let liAnchors = lis[i].querySelectorAll('a');
-                    let images = lis[i].querySelectorAll('img');
-                    // fix links
-                    for (let j = 0; j != liAnchors.length; j++)
-                        liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                    // make images smaller
-                    for (let j = 0; j != images.length; j++) {
-                        images[j].width = 12;
-                        images[j].height = 12;
-                    }
-                    jpHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                    jpHappenings.innerHTML += `<li>${timeAgo(happeningsTimeStamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec((lis[i].querySelector('a:nth-of-type(1)') as HTMLAnchorElement).href);
+                const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
                 const nationName = nationNameMatch[1];
+
                 // don't allow us to endorse ourself
                 if (canonicalize(nationName) === canonicalize(result.currentwa))
                     resigned.push(nationName);
@@ -452,14 +444,14 @@
                 if (nationsEndorsed.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (lis[i].innerHTML.indexOf('resigned from') !== -1)
+                if (happeningsText[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 // Only include nations with keywords
                 if (endorseKeywords.length &&
                     (endorseKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                else if (happeningsText[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         function onEndorseClick(e: MouseEvent)
                         {
@@ -526,44 +518,36 @@
                 dossierKeywords = result.dossierkeywords;
             const maxHappeningsCount = Number(result.dossierhappeningscount) || 10;
             const raiderJp = result.raiderjp;
-            let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${raiderJp}/filter=move+member+endo`,
-                'GET');
-            const nationNameRegex = new RegExp('nation=([A-Za-z0-9_-]+)');
-            // only so we can use queryselector on the response DOM rather than using regex matching
-            let div = document.createElement('div');
-            div.innerHTML = response;
-            let lis = div.querySelectorAll('li');
+
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`);
+            const apiText = await apiResponse.text();
+            const happeningsResponse = parseApiHappenings(apiText);
+            const happeningsText = happeningsResponse.text;
+            const happeningsTimestamps = happeningsResponse.timestamps;
+            const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
+
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != lis.length; i++) {
+            for (let i = 0; i != happeningsText.length; i++) {
                 // update the raider jp happenings at the same time so we don't have to make an extra query (max 10)
                 if (happeningsAdded < maxHappeningsCount) {
-                    let liAnchors = lis[i].querySelectorAll('a');
-                    let images = lis[i].querySelectorAll('img');
-                    // fix link
-                    for (let j = 0; j != liAnchors.length; j++)
-                        liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                    // make images smaller
-                    for (let j = 0; j != images.length; j++) {
-                        images[j].width = 12;
-                        images[j].height = 12;
-                    }
-                    raiderHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                    raiderHappenings.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec((lis[i].querySelector('a:nth-of-type(1)') as HTMLAnchorElement).href);
+                const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
                 const nationName = nationNameMatch[1];
+                console.log(nationName);
                 // don't let us dossier the same nation twice
                 if (nationsTracked.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (lis[i].innerHTML.indexOf('resigned from') !== -1)
+                if (happeningsText[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 if (dossierKeywords.length &&
                     (dossierKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                else if (happeningsText[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         async function onDossierClick(e: MouseEvent): Promise<void>
                         {
@@ -880,21 +864,18 @@
     async function checkIfUpdated(e: MouseEvent): Promise<void>
     {
         didIUpdate.innerHTML = '';
-        let responseDiv = document.createElement('div');
-        responseDiv.innerHTML = await makeAjaxQuery('/page=ajax2/a=reports/view=self/filter=change', 'GET');
-        let lis = responseDiv.querySelectorAll('li');
+        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`);
+        const xml = await response.text();
+        const happeningsObject = await parseApiHappenings(xml);
+        const happeningsText = happeningsObject.text;
+        const happeningsTimestamps = happeningsObject.timestamps;
+
         // limit to max 5 happenings to save space
         for (let i = 0; i != 3; i++) {
-            if (typeof lis[i] === 'undefined')
+            if (typeof happeningsText[i] === 'undefined')
                 break;
             else {
-                // resize image
-                let images = lis[i].querySelectorAll('img');
-                for (let j = 0; j != images.length; j++) {
-                    images[j].width = 12;
-                    images[j].height = 12;
-                }
-                didIUpdate.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                didIUpdate.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
             }
         }
     }
@@ -902,25 +883,18 @@
     async function updateWorldHappenings(e: MouseEvent): Promise<void>
     {
         worldHappenings.innerHTML = '';
-        let response: string = await makeAjaxQuery('/page=ajax2/a=reports/view=world/filter=move+member+endo', 'GET');
-        let responseElement: DocumentFragment = document.createRange().createContextualFragment(response);
-        let lis = responseElement.querySelectorAll('li');
+        const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo');
+        const responseText = await response.text();
+        const happeningsResponse = parseApiHappenings(responseText);
+        const happeningsText = happeningsResponse.text;
+        const happeningsTimestamps = happeningsResponse.timestamps;
+
         // max 10
         chrome.storage.local.get('worldhappeningscount', (result) =>
         {
             let maxHappeningsCount = Number(result.worldhappeningscount) || 10;
             for (let i = 0; i < maxHappeningsCount; i++) {
-                let liAnchors = lis[i].querySelectorAll('a');
-                const images = lis[i].querySelectorAll('img');
-                // fix link
-                for (let j = 0; j != liAnchors.length; j++)
-                    liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                // make images smaller
-                for (let j = 0; j != images.length; j++) {
-                    images[j].width = 12;
-                    images[j].height = 12;
-                }
-                worldHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                worldHappenings.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
             }
         });
     }
