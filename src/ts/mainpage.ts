@@ -421,18 +421,20 @@
 
             const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`);
             const apiText = await apiResponse.text();
-            const happenings = parseApiHappenings(apiText);
+            const happeningsObject = parseApiHappenings(apiText);
+            const happeningsText = happeningsObject.text;
+            const happeningsTimeStamps = happeningsObject.timestamps;
             const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
 
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != happenings.length; i++) {
+            for (let i = 0; i != happeningsText.length; i++) {
                 // update the jp happenings at the same time so we don't have to make an extra query
                 if (happeningsAdded < maxHappeningsCount) {
-                    jpHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
+                    jpHappenings.innerHTML += `<li>${timeAgo(happeningsTimeStamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec(happenings[i]);
+                const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
                 const nationName = nationNameMatch[1];
 
                 // don't allow us to endorse ourself
@@ -442,14 +444,14 @@
                 if (nationsEndorsed.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (happenings[i].indexOf('resigned from') !== -1)
+                if (happeningsText[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 // Only include nations with keywords
                 if (endorseKeywords.length &&
                     (endorseKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (happenings[i].indexOf('was admitted') !== -1) {
+                else if (happeningsText[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         function onEndorseClick(e: MouseEvent)
                         {
@@ -519,31 +521,33 @@
 
             const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`);
             const apiText = await apiResponse.text();
-            const happenings = parseApiHappenings(apiText);
+            const happeningsResponse = parseApiHappenings(apiText);
+            const happeningsText = happeningsResponse.text;
+            const happeningsTimestamps = happeningsResponse.timestamps;
             const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
 
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != happenings.length; i++) {
+            for (let i = 0; i != happeningsText.length; i++) {
                 // update the raider jp happenings at the same time so we don't have to make an extra query (max 10)
                 if (happeningsAdded < maxHappeningsCount) {
-                    raiderHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
+                    raiderHappenings.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec(happenings[i]);
+                const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
                 const nationName = nationNameMatch[1];
                 console.log(nationName);
                 // don't let us dossier the same nation twice
                 if (nationsTracked.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (happenings[i].indexOf('resigned from') !== -1)
+                if (happeningsText[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 if (dossierKeywords.length &&
                     (dossierKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (happenings[i].indexOf('was admitted') !== -1) {
+                else if (happeningsText[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         async function onDossierClick(e: MouseEvent): Promise<void>
                         {
@@ -862,22 +866,16 @@
         didIUpdate.innerHTML = '';
         const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`);
         const xml = await response.text();
-        // Parse the XML string into a document
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xml, "application/xml");
-
-        // Extract all <TEXT> elements
-        const textElements = xmlDoc.getElementsByTagName("TEXT");
-
-        // Convert the HTMLCollection to an array and extract the text content
-        const texts = Array.from(textElements).map(elem => elem.textContent);
+        const happeningsObject = await parseApiHappenings(xml);
+        const happeningsText = happeningsObject.text;
+        const happeningsTimestamps = happeningsObject.timestamps;
 
         // limit to max 5 happenings to save space
         for (let i = 0; i != 3; i++) {
-            if (typeof texts[i] === 'undefined')
+            if (typeof happeningsText[i] === 'undefined')
                 break;
             else {
-                didIUpdate.innerHTML += `<li>${formatApiString(texts[i])}</li>`;
+                didIUpdate.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
             }
         }
     }
@@ -886,14 +884,17 @@
     {
         worldHappenings.innerHTML = '';
         const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo');
-        const happenings = parseApiHappenings(await response.text());
+        const responseText = await response.text();
+        const happeningsResponse = parseApiHappenings(responseText);
+        const happeningsText = happeningsResponse.text;
+        const happeningsTimestamps = happeningsResponse.timestamps;
 
         // max 10
         chrome.storage.local.get('worldhappeningscount', (result) =>
         {
             let maxHappeningsCount = Number(result.worldhappeningscount) || 10;
             for (let i = 0; i < maxHappeningsCount; i++) {
-                worldHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
+                worldHappenings.innerHTML += `<li>${timeAgo(happeningsTimestamps[i])}: ${formatApiString(happeningsText[i])}</li>`;
             }
         });
     }
