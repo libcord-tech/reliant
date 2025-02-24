@@ -418,33 +418,24 @@
                 endorseKeywords = result.endorsekeywords;
             const maxHappeningsCount = Number(result.endorsehappeningscount) || 10;
             const jumpPoint = result.jumppoint || 'artificial_solar_system';
-            let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${jumpPoint}/filter=move+member+endo`,
-                'GET');
-            const nationNameRegex = new RegExp('nation=([A-Za-z0-9_-]+)');
-            // only so we can use queryselector on the response DOM rather than using regex matching
-            let div = document.createElement('div');
-            div.innerHTML = response;
-            let lis = div.querySelectorAll('li');
+            // let response = await makeAjaxQuery(`/page=ajax2/a=reports/view=region.${jumpPoint}/filter=move+member+endo`,
+            //     'GET');
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`);
+            const apiText = await apiResponse.text();
+            const happenings = parseApiHappenings(apiText);
+            const nationNameRegex = new RegExp('@@([A-Za-z0-9_-]+)@@');
+
             let resigned: string[] = [];
             let happeningsAdded: number = 0;
-            for (let i = 0; i != lis.length; i++) {
+            for (let i = 0; i != happenings.length; i++) {
                 // update the jp happenings at the same time so we don't have to make an extra query
                 if (happeningsAdded < maxHappeningsCount) {
-                    let liAnchors = lis[i].querySelectorAll('a');
-                    let images = lis[i].querySelectorAll('img');
-                    // fix links
-                    for (let j = 0; j != liAnchors.length; j++)
-                        liAnchors[j].href = liAnchors[j].href.replace('page=blank/', '');
-                    // make images smaller
-                    for (let j = 0; j != images.length; j++) {
-                        images[j].width = 12;
-                        images[j].height = 12;
-                    }
-                    jpHappenings.innerHTML += `<li>${lis[i].innerHTML}</li>`;
+                    jpHappenings.innerHTML += `<li>${formatApiString(happenings[i])}</li>`;
                     happeningsAdded++;
                 }
-                const nationNameMatch = nationNameRegex.exec((lis[i].querySelector('a:nth-of-type(1)') as HTMLAnchorElement).href);
+                const nationNameMatch = nationNameRegex.exec(happenings[i]);
                 const nationName = nationNameMatch[1];
+
                 // don't allow us to endorse ourself
                 if (canonicalize(nationName) === canonicalize(result.currentwa))
                     resigned.push(nationName);
@@ -452,14 +443,14 @@
                 if (nationsEndorsed.indexOf(nationName) !== -1)
                     resigned.push(nationName);
                 // Don't include nations that probably aren't in the WA
-                if (lis[i].innerHTML.indexOf('resigned from') !== -1)
+                if (happenings[i].indexOf('resigned from') !== -1)
                     resigned.push(nationName);
                 // Only include nations with keywords
                 if (endorseKeywords.length &&
                     (endorseKeywords.every((keyword) => nationName.indexOf(keyword) === -1))) {
                     resigned.push(nationName);
                 }
-                else if (lis[i].innerHTML.indexOf('was admitted') !== -1) {
+                else if (happenings[i].indexOf('was admitted') !== -1) {
                     if (resigned.indexOf(nationName) === -1) {
                         function onEndorseClick(e: MouseEvent)
                         {
