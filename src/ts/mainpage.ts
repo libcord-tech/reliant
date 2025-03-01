@@ -408,6 +408,7 @@
 
     function refreshEndorse(e: MouseEvent): void
     {
+        const clickedButton = e.target as HTMLInputElement;
         const jpHappenings = document.querySelector('#jp-happenings');
         nationsToEndorse.innerHTML = '';
         jpHappenings.innerHTML = '';
@@ -419,7 +420,7 @@
             const maxHappeningsCount = Number(result.endorsehappeningscount) || 10;
             const jumpPoint = result.jumppoint || 'artificial_solar_system';
 
-            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`);
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`, {}, clickedButton);
             const apiText = await apiResponse.text();
             const happeningsObject = parseApiHappenings(apiText);
             const happeningsText = happeningsObject.text;
@@ -508,6 +509,7 @@
 
     function refreshDossier(e: MouseEvent): void
     {
+        const clickedButton = e.target as HTMLInputElement;
         const raiderHappenings = document.querySelector('#raider-happenings');
         raiderHappenings.innerHTML = '';
         nationsToDossier.innerHTML = '';
@@ -519,7 +521,7 @@
             const maxHappeningsCount = Number(result.dossierhappeningscount) || 10;
             const raiderJp = result.raiderjp;
 
-            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`);
+            const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${raiderJp};filter=move+member+endo`, {}, clickedButton);
             const apiText = await apiResponse.text();
             const happeningsResponse = parseApiHappenings(apiText);
             const happeningsText = happeningsResponse.text;
@@ -536,7 +538,6 @@
                 }
                 const nationNameMatch = nationNameRegex.exec(happeningsText[i]);
                 const nationName = nationNameMatch[1];
-                console.log(nationName);
                 // don't let us dossier the same nation twice
                 if (nationsTracked.indexOf(nationName) !== -1)
                     resigned.push(nationName);
@@ -863,8 +864,9 @@
 
     async function checkIfUpdated(e: MouseEvent): Promise<void>
     {
+        const clickedButton = e.target as HTMLInputElement;
         didIUpdate.innerHTML = '';
-        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`);
+        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`, {}, clickedButton);
         const xml = await response.text();
         const happeningsObject = await parseApiHappenings(xml);
         const happeningsText = happeningsObject.text;
@@ -882,8 +884,9 @@
 
     async function updateWorldHappenings(e: MouseEvent): Promise<void>
     {
+        const clickedButton = e.target as HTMLInputElement;
         worldHappenings.innerHTML = '';
-        const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo');
+        const response = await fetchWithRateLimit('/cgi-bin/api.cgi?q=happenings;filter=move+member+endo', {}, clickedButton);
         const responseText = await response.text();
         const happeningsResponse = parseApiHappenings(responseText);
         const happeningsText = happeningsResponse.text;
