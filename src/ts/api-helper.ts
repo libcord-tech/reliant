@@ -16,9 +16,10 @@ let rateLimitResetTime = 0;    // When the current rate-limit window resets (in 
  *
  * @param url - The URL to fetch.
  * @param options - Fetch options (method, headers, body, etc.).
+ * @param caller - The HTML element that triggered the fetch request.
  * @returns A Promise resolving to the fetch Response.
  */
-async function fetchWithRateLimit(url: string, options: RequestInit = {}): Promise<Response> {
+async function fetchWithRateLimit(url: string, options: RequestInit = {}, caller: HTMLInputElement = undefined): Promise<Response> {
     // --- 1. Check if we are still within a rate-limited window with no remaining calls
     if (Date.now() < rateLimitResetTime && rateLimitRemaining <= 0) {
         // We are in the middle of a window but have used up all requests; wait for reset
@@ -28,6 +29,9 @@ async function fetchWithRateLimit(url: string, options: RequestInit = {}): Promi
     }
 
     // --- 2. Make the request
+    if (caller) {
+        caller.disabled = true;
+    }
     let response = await fetch(url, options);
 
     // If the server returns HTTP 429, we must wait the "Retry-After" duration
@@ -64,5 +68,8 @@ async function fetchWithRateLimit(url: string, options: RequestInit = {}): Promi
     }
 
     // --- 4. Return the response (or you could also parse JSON here)
+    if (caller) {
+        caller.disabled = false;
+    }
     return response;
 }
