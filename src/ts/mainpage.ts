@@ -866,7 +866,7 @@
     {
         const clickedButton = e.target as HTMLInputElement;
         didIUpdate.innerHTML = '';
-        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?nation=${currentWANation.innerHTML}&q=happenings`, {}, clickedButton);
+        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=nation.${currentWANation.innerHTML};filter=change`, {}, clickedButton);
         const xml = await response.text();
         const happeningsObject = await parseApiHappenings(xml);
         const happeningsText = happeningsObject.text;
