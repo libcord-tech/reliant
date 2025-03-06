@@ -1,6 +1,6 @@
 {
   "name": "reliant",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "sass": "^1.77.4",
