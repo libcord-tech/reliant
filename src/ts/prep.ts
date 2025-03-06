@@ -126,8 +126,13 @@
                     if (typeof nextNation === 'undefined')
                         return;
                     document.querySelector('#current-switcher').innerHTML = nextNation;
-                    let response = await makeAjaxQuery(`/page=un?nation=${nextNation}&password=${result.password}&logging_in=1`,
-                        'GET');
+                    // let response = await makeAjaxQuery(`/page=un?nation=${nextNation}&password=${result.password}&logging_in=1`,
+                    //     'GET');
+                    const formData = new FormData();
+                    formData.set('nation', nextNation);
+                    formData.set('password', result.password);
+                    formData.set('logging_in', '1');
+                    let response = await makeAjaxQuery('/page=un', 'POST', formData);
                     getChk(response);
                     prepButton.value = 'Apply';
                 });
