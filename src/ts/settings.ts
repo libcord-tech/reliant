@@ -372,19 +372,53 @@ async function findMyWa(e: MouseEvent): Promise<void>
 chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
-    const prepSwitchers: string[] = result.prepswitchers ?? [];
-    for (let i = 0; i != prepSwitchers.length; i++)
-        currentSwitcherSet.innerHTML +=
-            `<a href="/page=un?nation=${prepSwitchers[i]}&password=${result.password}&logging_in=1" target="_blank">${prepSwitchers[i]}</a><br>`;
+    const prepSwitchers = result.prepswitchers ?? [];
+
+    // Create a document fragment
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < prepSwitchers.length; i++) {
+        const switcherName = prepSwitchers[i];
+
+        // Create anchor element
+        const anchor = document.createElement('a');
+        anchor.href = `/page=un?nation=${switcherName}&password=${password}&logging_in=1`;
+        anchor.target = '_blank';
+        anchor.textContent = switcherName;
+
+        // Append anchor to the fragment
+        fragment.appendChild(anchor);
+
+        // Add a <br> element
+        fragment.appendChild(document.createElement('br'));
+    }
+
+    // Append the fragment to the DOM once
+    currentSwitcherSet.appendChild(fragment);
 });
 
-chrome.storage.local.get('switchers', (result) =>
-{
+chrome.storage.local.get('switchers', (result) => {
     const currentApplications = document.querySelector('#current-stored-applications');
-    const applications: Switcher[] = result.switchers ?? [];
-    for (let i = 0; i !== applications.length; i++) {
-        currentApplications.innerHTML += `<p>Name: ${applications[i].name}<br>ID: ${applications[i].appid}</p>`;
+    const applications = result.switchers ?? []; // Assuming Switcher[] is inferred or defined elsewhere
+
+    // Create a document fragment
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < applications.length; i++) {
+        const application = applications[i];
+
+        // Create a paragraph element
+        const p = document.createElement('p');
+
+        // Set its innerHTML to include the name and ID
+        p.innerHTML = `Name: ${application.name}<br>ID: ${application.appid}`;
+        
+        // Append the paragraph to the fragment
+        fragment.appendChild(p);
     }
+
+    // Append the fragment to the DOM once
+    currentApplications.appendChild(fragment);
 });
 
 /*
