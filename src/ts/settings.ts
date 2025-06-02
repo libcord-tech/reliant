@@ -373,6 +373,7 @@ chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
     const prepSwitchers = result.prepswitchers ?? [];
+    const password = result.password || '';
 
     // Create a document fragment
     const fragment = document.createDocumentFragment();
