@@ -21,6 +21,7 @@
     {
         const nationName: string = urlParameters['nation'];
         let endorsingNations: string[] = await getNationEndorsements(nationName);
+        endorsingNations.reverse();
         const sidePanel: HTMLDivElement = document.querySelector('#panel');
         const endorsementList: HTMLUListElement = document.createElement('ul');
         for (let i = 0; i !== endorsingNations.length; i++) {
