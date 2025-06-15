@@ -108,6 +108,13 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <p><input type="number" id="max-happenings-count" min="1" max="20"></p>
 <p><input class="button" type="button" id="set-max-happenings" value="Set"></p>
 </fieldset>
+<fieldset>
+<legend>Occupation Chasing Mode</legend>
+<p>When enabled, the move key will step through a sequence: Chase → Update Localid → Update Region Status → Endorse Delegate. Each step requires a separate keypress.</p>
+<input type="checkbox" id="occupation-mode-toggle">
+<label for="occupation-mode-toggle">Enable Occupation Chasing Mode</label>
+<p>Current: <b id="current-occupation-mode">Disabled</b></p>
+</fieldset>
 <fieldset id="keys">
 <legend>Change Keys</legend>
 <p id="current-key"></p>
@@ -235,6 +242,7 @@ document.querySelector('#set-blocked-regions').addEventListener('click', setBloc
 document.querySelector('#set-dossier-keywords').addEventListener('click', setDossierKeywords);
 document.querySelector('#set-endorse-keywords').addEventListener('click', setEndorseKeywords);
 document.querySelector('#find-wa').addEventListener('click', findMyWa);
+document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
 
 /*
  * Handlers
@@ -369,6 +377,15 @@ async function findMyWa(e: MouseEvent): Promise<void>
     xhr.send();
 }
 
+async function toggleOccupationMode(e: Event): Promise<void>
+{
+    const isEnabled = (e.target as HTMLInputElement).checked;
+    await setStorageValue('occupationmode', isEnabled);
+    await setStorageValue('occupationsequence', 'ready');
+    document.querySelector('#current-occupation-mode').innerHTML = isEnabled ? 'Enabled' : 'Disabled';
+    notyf.success(`Occupation mode ${isEnabled ? 'enabled' : 'disabled'}`);
+}
+
 chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
@@ -486,7 +503,8 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('roname'),
             getCurrentKey('blockedregions'),
             getCurrentKey('dossierkeywords'),
-            getCurrentKey('endorsekeywords')
+            getCurrentKey('endorsekeywords'),
+            getCurrentKey('occupationmode')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -495,12 +513,17 @@ chrome.storage.local.get('switchers', (result) => {
         const blockedRegions = currentSettings[3] ?? [];
         const dossierKeywords = currentSettings[4] ?? [];
         const endorseKeywords = currentSettings[5] ?? [];
+        const occupationMode = currentSettings[6] ?? false;
+        
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
         for (let i = 0; i !== dossierKeywords.length; i++)
             document.querySelector('#current-dossier-keywords').innerHTML += `<b>${dossierKeywords[i]}</b><br>`;
         for (let i = 0; i !== endorseKeywords.length; i++)
             (document.querySelector('#endorse-keywords') as HTMLTextAreaElement).value += `${endorseKeywords[i]}\n`;
+        
+        (document.querySelector('#occupation-mode-toggle') as HTMLInputElement).checked = Boolean(occupationMode);
+        document.querySelector('#current-occupation-mode').innerHTML = occupationMode ? 'Enabled' : 'Disabled';
     }
 
     await displayCurrentKeys();
