@@ -73,6 +73,10 @@
                     <input type="button" id="move-to-jp" value="Move to JP" class="ajaxbutton">
                     <span class="subheader">Chase</span>
                     <input type="button" id="chasing-button" value="Refresh" class="ajaxbutton">
+                    <span class="subheader occupation-mode-toggle">Occupation Mode</span>
+                    <span class="information occupation-mode-toggle" id="occupation-status">Disabled</span>
+                    <span class="subheader occupation-mode-toggle">Sequence</span>
+                    <span class="information occupation-mode-toggle" id="occupation-sequence">Ready</span>
                 </div>
                 <!-- Reports Container -->
                 <div id="reports-container">
@@ -655,10 +659,111 @@
         return movedToRegion;
     }
 
+    async function updateOccupationSequence(newSequence: string): Promise<void>
+    {
+        await setStorageValue('occupationsequence', newSequence);
+        document.querySelector('#occupation-sequence').innerHTML = newSequence;
+    }
+
+    async function performOccupationSequence(): Promise<void>
+    {
+        const occupationSequence = await getStorageValue('occupationsequence') || 'ready';
+        
+        switch (occupationSequence) {
+            case 'ready':
+                // Start with chasing
+                await performChaseAction();
+                break;
+            case 'awaiting-localid':
+                // User pressed key again, update localid
+                await performLocalIdUpdate();
+                break;
+            case 'awaiting-region':
+                // User pressed key again, update region status
+                await performRegionUpdate();
+                break;
+            case 'awaiting-endorsement':
+                // User pressed key again, endorse delegate
+                await performEndorsement();
+                break;
+        }
+    }
+
+    async function performChaseAction(): Promise<void>
+    {
+        const doNotMove: string[] = await getStorageValue('blockedregions') || [];
+        const moveRegion = getMovedToRegion();
+        
+        if (moveRegion) {
+            if (doNotMove.indexOf(canonicalize(moveRegion)) !== -1) {
+                status.innerHTML = `Blocked region: ${moveRegion}. Sequence stopped.`;
+                await updateOccupationSequence('ready');
+                return;
+            }
+            
+            chrome.storage.local.get('localid', async (result) =>
+            {
+                const localId = result.localid;
+                const formData = new FormData();
+                formData.set('localid', localId);
+                formData.set('region_name', moveRegion);
+                formData.set('move_region', '1');
+                let response = await makeAjaxQuery('/page=change_region', 'POST', formData);
+                if (response.indexOf('This request failed a security check.') !== -1) {
+                    status.innerHTML = `Failed to move to ${moveRegion}. Sequence stopped.`;
+                    await updateOccupationSequence('ready');
+                }
+                else {
+                    status.innerHTML = `Moved to ${moveRegion}. Press move key to update localid.`;
+                    currentRegion.innerHTML = moveRegion;
+                    document.querySelector('#wa-delegate').innerHTML = 'N/A';
+                    document.querySelector('#last-wa-update').innerHTML = 'N/A';
+                    // Wait for next keypress
+                    await updateOccupationSequence('awaiting-localid');
+                }
+            });
+        } else {
+            status.innerHTML = 'No movement detected. Sequence stopped.';
+            await updateOccupationSequence('ready');
+        }
+    }
+
+    async function performLocalIdUpdate(): Promise<void>
+    {
+        let response = await makeAjaxQuery('/region=rwby', 'GET');
+        getLocalId(response);
+        status.innerHTML = 'Updated localid. Press move key to update region status.';
+        // Wait for next keypress
+        await updateOccupationSequence('awaiting-region');
+    }
+
+    async function performRegionUpdate(): Promise<void>
+    {
+        await updateRegionStatus({ target: null } as MouseEvent);
+        status.innerHTML = 'Updated region status. Press move key to endorse delegate.';
+        // Wait for next keypress
+        await updateOccupationSequence('awaiting-endorsement');
+    }
+
+    async function performEndorsement(): Promise<void>
+    {
+        await endorseDelegate({ target: null } as MouseEvent);
+        status.innerHTML = 'Occupation sequence completed.';
+        // Reset sequence to ready
+        await updateOccupationSequence('ready');
+    }
+
     async function chasingButton(e: MouseEvent): Promise<void>
     {
-        // updated for SSE
-        // jump points and such
+        const occupationMode = await getStorageValue('occupationmode') || false;
+        
+        if (occupationMode) {
+            // In occupation mode, use the sequence logic
+            await performOccupationSequence();
+            return;
+        }
+        
+        // Original chasing logic for non-occupation mode
         const doNotMove: string[] = await new Promise((resolve, reject) =>
         {
             chrome.storage.local.get('blockedregions', (result) =>
@@ -669,7 +774,7 @@
                     resolve([]);
             });
         });
-        // relocations look like this: <li><a href="/nation=oathaastealre">oathaastealre</a> moved from <a href="/region=look_away">look_away</a> to <a href="/region=kaisereich">kaisereich</a></li>
+        
         const moveRegion = getMovedToRegion();
         if ((e.target as HTMLInputElement).value == 'Update Localid') {
             await manualLocalIdUpdate(e);
@@ -679,7 +784,6 @@
             chrome.storage.local.get('localid', async (result) =>
             {
                 const localId = result.localid;
-                // const moveRegion = (e.target as HTMLInputElement).getAttribute('data-moveregion');
                 const formData = new FormData();
                 formData.set('localid', localId);
                 formData.set('region_name', moveRegion);
@@ -949,6 +1053,14 @@
             }
             else if (key === 'currentwa')
                 currentWANation.innerHTML = storageChange.newValue || 'N/A';
+            else if (key === 'occupationmode') {
+                const occupationStatus = document.querySelector('#occupation-status');
+                occupationStatus.innerHTML = storageChange.newValue ? 'Enabled' : 'Disabled';
+            }
+            else if (key === 'occupationsequence') {
+                const occupationSequence = document.querySelector('#occupation-sequence');
+                occupationSequence.innerHTML = storageChange.newValue;
+            }
             else if (key === 'trackednations') {
                 const myNation = document.querySelector('#current-wa-nation').innerHTML;
                 eventSource.close();
@@ -1007,7 +1119,7 @@
      * Initialization
      */
 
-    chrome.storage.local.get(['switchers', 'currentwa'], (result) =>
+    chrome.storage.local.get(['switchers', 'currentwa', 'occupationmode', 'occupationsequence'], (result) =>
     {
         try {
             document.querySelector('#num-switchers').innerHTML = result.switchers.length as string;
@@ -1017,5 +1129,17 @@
         }
 
         currentWANation.innerHTML = result.currentwa || 'N/A';
+        
+        const occupationStatus = document.querySelector('#occupation-status');
+        const occupationSequence = document.querySelector('#occupation-sequence');
+        occupationStatus.innerHTML = result.occupationmode ? 'Enabled' : 'Disabled';
+        occupationSequence.innerHTML = result.occupationsequence || 'Ready';
+
+        if (!(result.occupationmode)) {
+            document.querySelectorAll('.occupation-mode-toggle').forEach((element) =>
+            {
+                element.classList.add('hidden');
+            });
+        }
     });
 })();
