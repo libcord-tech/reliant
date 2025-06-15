@@ -513,6 +513,7 @@
         const raiderHappenings = document.querySelector('#raider-happenings');
         raiderHappenings.innerHTML = '';
         nationsToDossier.innerHTML = '';
+        potentialNationsToTrack.clear();
         chrome.storage.local.get(['raiderjp', 'dossierhappeningscount', 'dossierkeywords'], async (result) =>
         {
             let dossierKeywords: string[] = [];
