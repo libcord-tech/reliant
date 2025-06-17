@@ -196,7 +196,27 @@
         },
         INFLUENCE: {
             regex: /@@([^@]+)@@'s influence in %%([^@]+)%% rose from "[^@]+" to "[^@]+"/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`
+            format: (matches) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`,
+            handler: async (matches) => {
+                // Check if this is the current WA nation updating
+                const updatedNation = matches[1];
+                const currentWA = await getStorageValue('currentwa');
+                if (currentWA && canonicalize(updatedNation) === canonicalize(currentWA)) {
+                    // Highlight the current WA nation element
+                    const currentWAElement = document.querySelector('#current-wa-nation');
+                    if (currentWAElement) {
+                        // Remove any existing highlights first
+                        currentWAElement.classList.remove('highlight-active', 'highlight-na');
+                        // Add red pulse animation
+                        currentWAElement.classList.add('highlight-update');
+                        // After animation, switch to green highlight
+                        setTimeout(() => {
+                            currentWAElement.classList.remove('highlight-update');
+                            currentWAElement.classList.add('highlight-active');
+                        }, 2000); // Match the pulse animation duration
+                    }
+                }
+            }
         },
         WA_DELEGATE: {
             regex: /@@([^@]+)@@ became WA Delegate of %%([^%]+)%%/,
@@ -207,6 +227,33 @@
 // Helper function to create links
     const formatLink = (text: string, type: 'nation' | 'region'): string => {
         return `<a href="/${type}=${text}">${text}</a>`;
+    };
+    
+    // Track timeout for N/A highlighting
+    let naHighlightTimeout: number | null = null;
+    
+    // Helper function to handle WA nation display highlighting
+    const updateWANationDisplay = (element: HTMLSpanElement, value: string): void => {
+        element.innerHTML = value;
+        
+        // Clear any existing timeout
+        if (naHighlightTimeout) {
+            clearTimeout(naHighlightTimeout);
+            naHighlightTimeout = null;
+        }
+        
+        // Remove all highlight classes first
+        element.classList.remove('highlight-update', 'highlight-na', 'highlight-active');
+        
+        // Add highlight-na class if value is N/A, but with a 5-second delay
+        if (value === 'N/A' || !value) {
+            naHighlightTimeout = setTimeout(() => {
+                // Check if the value is still N/A after the delay
+                if (element.innerHTML === 'N/A' || !element.innerHTML) {
+                    element.classList.add('highlight-na');
+                }
+            }, 5000);
+        }
     };
 
 // Helper function to append report
@@ -366,6 +413,8 @@
                 await setStorageValue('currentwa', '');
                 nationsTracked = [];
                 await setStorageValue('trackednations', []);
+                // Remove green highlight when resigning
+                currentWANation.classList.remove('highlight-active', 'highlight-update');
             }
         });
     }
@@ -1070,7 +1119,7 @@
                 (document.querySelector('#num-switchers') as HTMLSpanElement).innerHTML = String(newSwitchers.length);
             }
             else if (key === 'currentwa')
-                currentWANation.innerHTML = storageChange.newValue || 'N/A';
+                updateWANationDisplay(currentWANation, storageChange.newValue || 'N/A');
             else if (key === 'occupationmode') {
                 const occupationStatus = document.querySelector('#occupation-status');
                 occupationStatus.innerHTML = storageChange.newValue ? 'Enabled' : 'Disabled';
@@ -1146,7 +1195,7 @@
             if (e instanceof TypeError) {}
         }
 
-        currentWANation.innerHTML = result.currentwa || 'N/A';
+        updateWANationDisplay(currentWANation, result.currentwa || 'N/A');
         
         const occupationStatus = document.querySelector('#occupation-status');
         const occupationSequence = document.querySelector('#occupation-sequence');
