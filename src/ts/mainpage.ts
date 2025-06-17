@@ -904,39 +904,57 @@
     {
         if (currentRegion.innerHTML == 'N/A')
             return;
-        const nationRegex: RegExp = new RegExp('nation=([A-Za-z0-9_-]+)');
-        let response = await makeAjaxQuery(`/template-overall=none/region=${currentRegion.innerHTML}`, 'GET');
-        const responseDocument = document.createRange().createContextualFragment(response);
-        // update the region happenings at the same time to not make an extra query
+        
+        // Use the API to fetch region data
+        const regionName = currentRegion.innerHTML;
+        const response = await fetchWithRateLimit(`/cgi-bin/api.cgi?region=${regionName}&q=happenings+delegate+lastupdate`, {}, e?.target as HTMLInputElement);
+        const responseText = await response.text();
+        
+        // Parse the XML response
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(responseText, "application/xml");
+        
+        // Get delegate information
+        const delegateElement = xmlDoc.querySelector('DELEGATE');
+        const lastUpdateElement = xmlDoc.querySelector('LASTUPDATE');
+        
+        if (delegateElement && delegateElement.textContent) {
+            const delegateName = delegateElement.textContent;
+            // Format delegate display similar to the original HTML version
+            document.querySelector('#wa-delegate').innerHTML = `<span class="nname">${delegateName}</span>`;
+            (document.querySelector('#delegate-nation') as HTMLInputElement).value = delegateName;
+        } else {
+            document.querySelector('#wa-delegate').innerHTML = 'None.';
+            (document.querySelector('#delegate-nation') as HTMLInputElement).value = 'N/A';
+        }
+        
+        // Update last WA update time
+        if (lastUpdateElement && lastUpdateElement.textContent) {
+            const lastUpdateTimestamp = Number(lastUpdateElement.textContent);
+            const lastUpdateTime = timeAgo(lastUpdateTimestamp);
+            document.querySelector('#last-wa-update').innerHTML = lastUpdateTime;
+        } else {
+            document.querySelector('#last-wa-update').innerHTML = 'N/A';
+        }
+        
+        // Update region happenings
         chrome.storage.local.get('regionhappeningscount', (result) =>
         {
             let regionHappeningsCount: number = Number(result.regionhappeningscount) || 10;
-            let regionHappeningsLis = responseDocument.querySelectorAll('ul > li');
             regionHappenings.innerHTML = '';
-            for (let i = 0; i != regionHappeningsCount; i++) {
-                let anodes = regionHappeningsLis[i].querySelectorAll('a');
-                let images = regionHappeningsLis[i].querySelectorAll('img');
-                // fix link
-                for (let j = 0; j != anodes.length; j++)
-                    anodes[j].href = anodes[j].href.replace('page=blank/', '');
-                // make images smaller
-                for (let j = 0; j != images.length; j++) {
-                    images[j].width = 12;
-                    images[j].height = 12;
-                }
-                regionHappenings.innerHTML += `<li>${regionHappeningsLis[i].innerHTML}</li>`;
+            
+            // Parse happenings from the API response
+            const happeningsData = parseApiHappenings(responseText);
+            const happeningsText = happeningsData.text;
+            const happeningsTimestamps = happeningsData.timestamps;
+            
+            // Display happenings up to the configured count
+            for (let i = 0; i < Math.min(regionHappeningsCount, happeningsText.length); i++) {
+                const formattedText = formatApiString(happeningsText[i]);
+                const timeString = timeAgo(happeningsTimestamps[i]);
+                regionHappenings.innerHTML += `<li>${timeString}: ${formattedText}</li>`;
             }
         });
-        const updatedWaDelegate = responseDocument.querySelector('#regioncontent > p:nth-child(2) > a > span');
-
-        if (updatedWaDelegate) {
-            document.querySelector('#wa-delegate').innerHTML = updatedWaDelegate.innerHTML;
-            (document.querySelector('#delegate-nation') as HTMLInputElement).value = updatedWaDelegate.querySelector('.nname').innerHTML;
-        } else {
-            document.querySelector('#wa-delegate').innerHTML = 'None.';
-        }
-        const lastWaUpdate = responseDocument.querySelector('#regioncontent > p:nth-child(4) > time').innerHTML;
-        document.querySelector('#last-wa-update').innerHTML = lastWaUpdate;
     }
 
     async function checkCurrentRegion(e: MouseEvent): Promise<void>
