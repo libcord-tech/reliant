@@ -185,3 +185,69 @@ $font-family-heading: $font-family-base;
 ul {
     list-style-type: none;
 }
+
+/* Highlighting styles for current WA nation */
+#current-wa-nation {
+    transition: all 0.3s ease-in-out;
+    
+    &.highlight-active {
+        background-color: #4CAF50;
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+    }
+    
+    &.highlight-update {
+        background-color: #f44336;
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        box-shadow: 0 0 10px rgba(244, 67, 54, 0.8);
+        animation: pulse 2s ease-in-out;
+    }
+    
+    &.highlight-na {
+        background-color: #ff9800;
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        box-shadow: 0 0 10px rgba(255, 152, 0, 0.8);
+        animation: pulse-warning 2s ease-in-out infinite;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-warning {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Hidden class for occupation mode toggle */
+.hidden {
+    display: none;
+}

@@ -112,6 +112,8 @@ async function setDefaultStorageValues(): Promise<void>
         { key: 'prepswitchers', value: [] },
         { key: 'switchers', value: [] },
         { key: 'raiderjp', value: 'suspicious'},
+        { key: 'occupationmode', value: false },
+        { key: 'occupationsequence', value: 'ready' },
     ];
 
     for (const { key, value } of defaultValues) {
@@ -294,13 +296,21 @@ let keys: object = {};
 chrome.storage.local.get('movekey', (result) =>
 {
     const moveKey = result.movekey || 'X';
-    keys[moveKey] = () =>
+    keys[moveKey] = async () =>
     {
         const moveButton: HTMLButtonElement = document.querySelector('button[name=move_region]');
         if (moveButton)
             moveButton.click();
-        else if (urlParameters['reliant'] === 'main')
-            (document.querySelector('#chasing-button') as HTMLInputElement).click();
+        else if (urlParameters['reliant'] === 'main') {
+            const occupationMode = await getStorageValue('occupationmode') || false;
+            if (occupationMode) {
+                // In occupation mode, trigger sequence through chasing button
+                (document.querySelector('#chasing-button') as HTMLInputElement).click();
+            } else {
+                // Normal mode - just trigger chasing button
+                (document.querySelector('#chasing-button') as HTMLInputElement).click();
+            }
+        }
         else if (urlParameters['region']) {
             const updateLocalIdButton: HTMLInputElement = document.querySelector('.updatelocalid[data-clicked="0"]');
             if (updateLocalIdButton)
