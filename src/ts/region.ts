@@ -96,7 +96,9 @@
             regionalOfficersToDismiss = [];
             for (let i = 0; i !== officerBoxes.length; i++) {
                 let quietLink = officerBoxes[i].querySelector('.quietlink');
-                if (quietLink.innerHTML.indexOf('Founder') !== -1)
+                if (quietLink === null)
+                    continue;
+                else if (quietLink.innerHTML.indexOf('Governor') !== -1)
                     continue;
                 else if (quietLink.innerHTML.indexOf('WA Delegate') !== -1)
                     continue;
@@ -108,7 +110,12 @@
             const responseElement = document.createRange().createContextualFragment(response);
 
             let updateTime: string = responseElement.querySelector('#regioncontent > p:nth-child(4) > time').innerHTML;
-            let waDelegate: string = responseElement.querySelector('#regioncontent > p:nth-child(2) > a > span > span.nname').innerHTML;
+            let waDelegate: string
+            try {
+                waDelegate = responseElement.querySelector('#regioncontent > p:nth-child(2) > a > span > span.nname').innerHTML;
+            } catch (error) {
+                waDelegate = "None";
+            }
             console.log(regionalOfficersToDismiss);
             console.log(waDelegate);
             console.log(updateTime);
@@ -187,7 +194,7 @@
                 formData.set('chk', chk);
                 const response = await makeAjaxQuery('/page=UN_status', 'POST', formData);
                 if (response.indexOf('You inform the World Assembly that') !== -1) {
-                    const nationNameRegex = new RegExp('<body id="loggedin" data-nname="([A-Za-z0-9_-]+?)">');
+                    const nationNameRegex = new RegExp('data-nname="([A-Za-z0-9_-]+?)"');
                     const match = nationNameRegex.exec(response);
                     regionStatus.innerHTML = `Resigned from the WA on ${match[1]}`;
                     actionButton.setAttribute('value', 'Admit on Next Switcher');
