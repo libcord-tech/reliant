@@ -329,7 +329,7 @@
             sseReconnectDelay = 1000;
             
             // Update SSE status indicator
-            const sseStatusElement = document.querySelector('#sse-status');
+            const sseStatusElement = document.querySelector('#sse-status') as HTMLSpanElement;
             if (sseStatusElement) {
                 sseStatusElement.innerHTML = '🟢 Connected';
                 sseStatusElement.style.color = '#4CAF50';
@@ -346,7 +346,7 @@
             console.error('SSE connection error:', error);
             
             // Update SSE status indicator
-            const sseStatusElement = document.querySelector('#sse-status');
+            const sseStatusElement = document.querySelector('#sse-status') as HTMLSpanElement;
             if (sseStatusElement) {
                 sseStatusElement.innerHTML = '🔴 Disconnected';
                 sseStatusElement.style.color = '#f44336';
