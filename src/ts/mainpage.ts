@@ -81,6 +81,7 @@
                 <!-- Reports Container -->
                 <div id="reports-container">
                     <span class="header">Reports</span>
+                    <span id="sse-status" style="float: right; font-size: 0.9em; color: #999;">⚪ Connecting...</span>
                     <label for="set-sse-timeout">Timeout (seconds)</label>
                     <input type="text" id="sse-timeout-value">
                     <input type="button" id="set-sse-timeout" value="Set">
@@ -303,8 +304,101 @@
         }
     };
 
-    // Set up event source
+    // SSE connection management variables
     let eventSource: EventSource;
+    let sseReconnectTimeout: number | null = null;
+    let sseReconnectDelay = 1000; // Start with 1 second delay
+    let sseConnectionRetries = 0;
+    const MAX_SSE_RETRIES = 5;
+    const SSE_DEBOUNCE_DELAY = 2000; // 2 second debounce for reconnections
+    
+    // Helper function to create SSE connection with retry logic
+    function createSSEConnection(url: string): void {
+        // Close existing connection if any
+        if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+            eventSource.close();
+        }
+        
+        eventSource = new EventSource(url);
+        eventSource.onmessage = handleEventMessage;
+        
+        eventSource.onopen = () => {
+            console.log('SSE connection opened');
+            // Reset retry counters on successful connection
+            sseConnectionRetries = 0;
+            sseReconnectDelay = 1000;
+            
+            // Update SSE status indicator
+            const sseStatusElement = document.querySelector('#sse-status');
+            if (sseStatusElement) {
+                sseStatusElement.innerHTML = '🟢 Connected';
+                sseStatusElement.style.color = '#4CAF50';
+            }
+            
+            // Clear any error status
+            const currentStatus = status.innerHTML;
+            if (currentStatus.includes('SSE connection') || currentStatus.includes('Retrying')) {
+                status.innerHTML = 'Connected to live updates.';
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE connection error:', error);
+            
+            // Update SSE status indicator
+            const sseStatusElement = document.querySelector('#sse-status');
+            if (sseStatusElement) {
+                sseStatusElement.innerHTML = '🔴 Disconnected';
+                sseStatusElement.style.color = '#f44336';
+            }
+            
+            // Check if connection is closed (likely due to 429 or network error)
+            if (eventSource.readyState === EventSource.CLOSED) {
+                if (sseConnectionRetries < MAX_SSE_RETRIES) {
+                    sseConnectionRetries++;
+                    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+                    const delay = Math.min(sseReconnectDelay * Math.pow(2, sseConnectionRetries - 1), 30000);
+                    
+                    console.log(`SSE connection failed. Retrying in ${delay/1000}s (attempt ${sseConnectionRetries}/${MAX_SSE_RETRIES})`);
+                    
+                    // Update status indicator with retry info
+                    if (sseStatusElement) {
+                        sseStatusElement.innerHTML = `🟡 Retry in ${delay/1000}s`;
+                        sseStatusElement.style.color = '#FFC107';
+                    }
+                    
+                    // Only show status if it's taking longer than expected
+                    if (sseConnectionRetries > 1) {
+                        status.innerHTML = `Reconnecting to updates in ${delay/1000}s...`;
+                    }
+                    
+                    setTimeout(() => {
+                        console.log(`Retrying SSE connection (attempt ${sseConnectionRetries})`);
+                        if (sseStatusElement) {
+                            sseStatusElement.innerHTML = '🟠 Reconnecting...';
+                            sseStatusElement.style.color = '#FF9800';
+                        }
+                        createSSEConnection(url);
+                    }, delay);
+                } else {
+                    status.innerHTML = 'Connection limit reached. Wait 30s before tracking more nations.';
+                    if (sseStatusElement) {
+                        sseStatusElement.innerHTML = '⏸️ Rate limited';
+                        sseStatusElement.style.color = '#9E9E9E';
+                    }
+                    // Reset after 30 seconds
+                    setTimeout(() => {
+                        sseConnectionRetries = 0;
+                        createSSEConnection(url);
+                    }, 30000);
+                }
+            }
+        };
+        
+        console.log(`New SSE url: ${url}`);
+    }
+
+    // Set up initial event source
     if (typeof EventSource !== 'undefined') {
         const myNation = await getStorageValue('currentwa');
         let url = `/api/nation:${myNation}+`;
@@ -316,19 +410,9 @@
             // lol
             url += `nation:haku`;
         }
-        eventSource = new EventSource(url);
-        eventSource.onmessage = handleEventMessage;
-        console.log(`New SSE url: ${url}`);
+        createSSEConnection(url);
     } else {
         console.error('EventSource is not supported in this browser');
-    }
-
-    eventSource.onopen = () => {
-        console.log('SSE connection opened');
-    }
-
-    eventSource.onerror = () => {
-        console.error('SSE connection error');
     }
 
     document.open();
@@ -628,6 +712,46 @@
                         potentialNationsToTrack.add(nationName);
                     }
                 }
+            }
+            
+            // Add "Track All" button if there are multiple nations to track
+            if (potentialNationsToTrack.size > 3) {
+                const trackAllLi = document.createElement('li');
+                trackAllLi.style.borderTop = '1px solid #333';
+                trackAllLi.style.paddingTop = '5px';
+                trackAllLi.style.marginTop = '5px';
+                
+                let trackAllButton = document.createElement('input');
+                trackAllButton.setAttribute('type', 'button');
+                trackAllButton.setAttribute('class', 'ajaxbutton');
+                trackAllButton.setAttribute('value', `Track All ${potentialNationsToTrack.size} Nations`);
+                trackAllButton.style.fontWeight = 'bold';
+                
+                trackAllButton.addEventListener('click', async () => {
+                    // Filter out nations that are already tracked
+                    const nationsToAdd = Array.from(potentialNationsToTrack)
+                        .filter(nation => !nationsTracked.includes(nation));
+                    
+                    if (nationsToAdd.length > 0) {
+                        // Add all nations at once
+                        nationsTracked.push(...nationsToAdd);
+                        await setStorageValue('trackednations', nationsTracked);
+                        
+                        // Clear the list
+                        nationsToDossier.innerHTML = '';
+                        potentialNationsToTrack.clear();
+                        
+                        // Show feedback
+                        status.innerHTML = `Tracking ${nationsToAdd.length} nations. Live updates will start in ${SSE_DEBOUNCE_DELAY/1000} seconds.`;
+                        notyf.success(`Added ${nationsToAdd.length} nations to tracking`);
+                    } else {
+                        status.innerHTML = 'All nations already being tracked.';
+                    }
+                });
+                
+                trackAllLi.appendChild(trackAllButton);
+                // Add at the beginning of the list
+                nationsToDossier.insertBefore(trackAllLi, nationsToDossier.firstChild);
             }
         });
     }
@@ -1129,23 +1253,45 @@
                 occupationSequence.innerHTML = storageChange.newValue;
             }
             else if (key === 'trackednations') {
-                const myNation = document.querySelector('#current-wa-nation').innerHTML;
-                eventSource.close();
-                let url = `/api/nation:${myNation}+`;
-                // nation:{nation} for each nation
-                const newTrackedNations: string[] = storageChange.newValue;
-                if (newTrackedNations.length > 0) {
-                    url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
-                    eventSource = new EventSource(url);
-                    eventSource.onmessage = handleEventMessage;
-                    console.log(`New SSE url: ${url}`);
-                } else {
-                    // lol
-                    url += `nation:haku`;
-                    eventSource = new EventSource(url);
-                    eventSource.onmessage = handleEventMessage;
-                    console.log(`New SSE url: ${url}`);
+                // Clear any existing reconnect timeout
+                if (sseReconnectTimeout) {
+                    clearTimeout(sseReconnectTimeout);
                 }
+                
+                const newTrackedNations: string[] = storageChange.newValue || [];
+                const addedCount = newTrackedNations.length - (nationsTracked?.length || 0);
+                
+                // Update local tracking immediately for UI responsiveness
+                nationsTracked = newTrackedNations;
+                
+                // Show immediate feedback that nations are being tracked
+                if (addedCount > 0) {
+                    // Don't override important status messages
+                    const currentStatus = status.innerHTML;
+                    if (!currentStatus.includes('Failed') && !currentStatus.includes('Error')) {
+                        if (addedCount === 1) {
+                            // Keep the specific nation tracking message from the button click
+                        } else {
+                            status.innerHTML = `Tracking ${addedCount} new nations. Updates starting soon...`;
+                        }
+                    }
+                }
+                
+                // Debounce SSE reconnection to prevent 429 errors
+                sseReconnectTimeout = setTimeout(() => {
+                    const myNation = document.querySelector('#current-wa-nation').innerHTML;
+                    let url = `/api/nation:${myNation}+`;
+                    
+                    if (newTrackedNations.length > 0) {
+                        url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
+                    } else {
+                        url += `nation:haku`;
+                    }
+                    
+                    // Use the connection function with retry logic
+                    createSSEConnection(url);
+                    sseReconnectTimeout = null;
+                }, SSE_DEBOUNCE_DELAY); // Wait 2 seconds before reconnecting
             }
         }
     }
