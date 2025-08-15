@@ -12,7 +12,7 @@
         <title>Reliant</title>
         <meta charset="utf-8">
     </head>
-    <body>
+    <body style="background-repeat: no-repeat; background-size: cover;">
         <div id="container">
             <div id="group-2">
                 <!-- Switchers -->
@@ -418,6 +418,13 @@
     document.open();
     document.write(pageContent);
     document.close();
+
+    chrome.storage.local.get('background', async (result) => {
+        if(result.background !== undefined) {
+            var body = (document.querySelector('body') as HTMLBodyElement);
+            body.style.backgroundImage = `url("${result.background}")`;
+        }
+    });
 
     await dieIfNoUserAgent();
 
