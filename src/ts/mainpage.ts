@@ -489,8 +489,9 @@
         try {
             const soundEnabled = await getStorageValue('moveSoundEnabled');
             if (soundEnabled !== false) { // Default to true if not set
+                const volumePercentage = await getStorageValue('moveSoundVolume') || 50;
                 const audio = new Audio(chrome.runtime.getURL('audio/move-success.wav'));
-                audio.volume = 0.5;
+                audio.volume = volumePercentage / 100; // Convert percentage to 0-1 range
                 await audio.play();
             }
         } catch (error) {

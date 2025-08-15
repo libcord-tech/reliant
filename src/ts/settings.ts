@@ -130,6 +130,8 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <input type="checkbox" id="move-sound-toggle" checked>
 <label for="move-sound-toggle">Play sound on successful region move</label>
 <p>Current: <b id="current-move-sound-status">Enabled</b></p>
+<p>Volume: <input type="range" id="move-sound-volume" min="0" max="100" value="50">
+<span id="current-move-sound-volume">50</span>%</p>
 </fieldset>
 <fieldset id="keys">
 <legend>Change Keys</legend>
@@ -263,6 +265,7 @@ document.querySelector('#unset-background-image').addEventListener('click', unse
 document.querySelector('#new-background-image').addEventListener('change', loadBackgroundImage);
 document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
 document.querySelector('#move-sound-toggle').addEventListener('change', toggleMoveSound);
+document.querySelector('#move-sound-volume').addEventListener('input', setMoveSoundVolume);
 
 /*
  * Handlers
@@ -454,6 +457,14 @@ async function toggleMoveSound(e: Event): Promise<void>
     notyf.success(`Move sound ${isEnabled ? 'enabled' : 'disabled'}`);
 }
 
+async function setMoveSoundVolume(e: Event): Promise<void>
+{
+    const volume = parseInt((e.target as HTMLInputElement).value);
+    await setStorageValue('moveSoundVolume', volume);
+    document.querySelector('#current-move-sound-volume').innerHTML = volume.toString();
+    // notyf.success(`Move sound volume set to ${volume}%`);
+}
+
 chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
@@ -573,7 +584,8 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('dossierkeywords'),
             getCurrentKey('endorsekeywords'),
             getCurrentKey('occupationmode'),
-            getCurrentKey('moveSoundEnabled')
+            getCurrentKey('moveSoundEnabled'),
+            getCurrentKey('moveSoundVolume')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -584,6 +596,7 @@ chrome.storage.local.get('switchers', (result) => {
         const endorseKeywords = currentSettings[5] ?? [];
         const occupationMode = currentSettings[6] ?? false;
         const moveSoundEnabled = currentSettings[7] ?? false;
+        const moveSoundVolume = currentSettings[8] ?? 50;
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -597,6 +610,9 @@ chrome.storage.local.get('switchers', (result) => {
         
         (document.querySelector('#move-sound-toggle') as HTMLInputElement).checked = Boolean(moveSoundEnabled);
         document.querySelector('#current-move-sound-status').innerHTML = moveSoundEnabled ? 'Enabled' : 'Disabled';
+        
+        (document.querySelector('#move-sound-volume') as HTMLInputElement).value = moveSoundVolume.toString();
+        document.querySelector('#current-move-sound-volume').innerHTML = moveSoundVolume.toString();
     }
 
     await displayCurrentKeys();
