@@ -484,6 +484,20 @@
         await setStorageValue('currentwa', nationNameRegex.exec(response)[1]);
     }
 
+    async function playMoveSuccessSound(): Promise<void>
+    {
+        try {
+            const soundEnabled = await getStorageValue('moveSoundEnabled');
+            if (soundEnabled !== false) { // Default to true if not set
+                const audio = new Audio(chrome.runtime.getURL('audio/move-success.wav'));
+                audio.volume = 0.5;
+                await audio.play();
+            }
+        } catch (error) {
+            console.log('Failed to play move success sound:', error);
+        }
+    }
+
     /*
      * Event Handlers
      */
@@ -790,6 +804,7 @@
                     else {
                         status.innerHTML = `Moved to ${moveRegion}`;
                         currentRegion.innerHTML = moveRegion;
+                        await playMoveSuccessSound();
                     }
                     (e.target as HTMLInputElement).value = 'Update Localid';
                 });
@@ -898,6 +913,7 @@
                     currentRegion.innerHTML = moveRegion;
                     document.querySelector('#wa-delegate').innerHTML = 'N/A';
                     document.querySelector('#last-wa-update').innerHTML = 'N/A';
+                    await playMoveSuccessSound();
                     // Wait for next keypress
                     await updateOccupationSequence('awaiting-localid');
                 }
@@ -977,6 +993,7 @@
                 else {
                     status.innerHTML = `Moved to ${moveRegion}`;
                     currentRegion.innerHTML = moveRegion;
+                    await playMoveSuccessSound();
                 }
                 (e.target as HTMLInputElement).value = 'Update Localid';
                 (e.target as HTMLInputElement).setAttribute('data-moveregion', '');

@@ -124,6 +124,13 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <label for="occupation-mode-toggle">Enable Occupation Chasing Mode</label>
 <p>Current: <b id="current-occupation-mode">Disabled</b></p>
 </fieldset>
+<fieldset>
+<legend>Move Success Sound</legend>
+<p>When enabled, a notification sound will play when you successfully move to a different region.</p>
+<input type="checkbox" id="move-sound-toggle" checked>
+<label for="move-sound-toggle">Play sound on successful region move</label>
+<p>Current: <b id="current-move-sound-status">Enabled</b></p>
+</fieldset>
 <fieldset id="keys">
 <legend>Change Keys</legend>
 <p id="current-key"></p>
@@ -255,6 +262,7 @@ document.querySelector('#set-background-image').addEventListener('click', setBac
 document.querySelector('#unset-background-image').addEventListener('click', unsetBackgroundImage);
 document.querySelector('#new-background-image').addEventListener('change', loadBackgroundImage);
 document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
+document.querySelector('#move-sound-toggle').addEventListener('change', toggleMoveSound);
 
 /*
  * Handlers
@@ -438,6 +446,14 @@ async function toggleOccupationMode(e: Event): Promise<void>
     notyf.success(`Occupation mode ${isEnabled ? 'enabled' : 'disabled'}`);
 }
 
+async function toggleMoveSound(e: Event): Promise<void>
+{
+    const isEnabled = (e.target as HTMLInputElement).checked;
+    await setStorageValue('moveSoundEnabled', isEnabled);
+    document.querySelector('#current-move-sound-status').innerHTML = isEnabled ? 'Enabled' : 'Disabled';
+    notyf.success(`Move sound ${isEnabled ? 'enabled' : 'disabled'}`);
+}
+
 chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
@@ -556,7 +572,8 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('blockedregions'),
             getCurrentKey('dossierkeywords'),
             getCurrentKey('endorsekeywords'),
-            getCurrentKey('occupationmode')
+            getCurrentKey('occupationmode'),
+            getCurrentKey('moveSoundEnabled')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -566,6 +583,7 @@ chrome.storage.local.get('switchers', (result) => {
         const dossierKeywords = currentSettings[4] ?? [];
         const endorseKeywords = currentSettings[5] ?? [];
         const occupationMode = currentSettings[6] ?? false;
+        const moveSoundEnabled = currentSettings[7] ?? false;
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -576,6 +594,9 @@ chrome.storage.local.get('switchers', (result) => {
         
         (document.querySelector('#occupation-mode-toggle') as HTMLInputElement).checked = Boolean(occupationMode);
         document.querySelector('#current-occupation-mode').innerHTML = occupationMode ? 'Enabled' : 'Disabled';
+        
+        (document.querySelector('#move-sound-toggle') as HTMLInputElement).checked = Boolean(moveSoundEnabled);
+        document.querySelector('#current-move-sound-status').innerHTML = moveSoundEnabled ? 'Enabled' : 'Disabled';
     }
 
     await displayCurrentKeys();
