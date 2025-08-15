@@ -74,6 +74,15 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <input type="button" id="set-endorse-keywords" value="Set">
 </fieldset>
 <fieldset>
+<legend>Background Image</legend>
+<input type="file" id="new-background-image">
+<br/>
+<img id="uploaded-background-image" style="max-width:60%;"></img>
+<br/>
+<input class="button" type="button" id="set-background-image" value="Set">
+<input class="button" type="button" id="unset-background-image" value="Remove Background Image">
+</fieldset>
+<fieldset>
 <legend>Prepping</legend>
 <p><strong>Password</strong></p>
 <input type="password" id="my-password">
@@ -242,6 +251,9 @@ document.querySelector('#set-blocked-regions').addEventListener('click', setBloc
 document.querySelector('#set-dossier-keywords').addEventListener('click', setDossierKeywords);
 document.querySelector('#set-endorse-keywords').addEventListener('click', setEndorseKeywords);
 document.querySelector('#find-wa').addEventListener('click', findMyWa);
+document.querySelector('#set-background-image').addEventListener('click', setBackgroundImage);
+document.querySelector('#unset-background-image').addEventListener('click', unsetBackgroundImage);
+document.querySelector('#new-background-image').addEventListener('change', loadBackgroundImage);
 document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
 
 /*
@@ -314,6 +326,46 @@ function setPassword(e: MouseEvent): void
     const password = (document.querySelector('#my-password') as HTMLInputElement).value;
     chrome.storage.local.set({'password': password});
     notyf.success(`Set password to ${password}`);
+}
+
+function loadBackgroundImage(e: Event): void
+{
+    var files = (e.target as HTMLInputElement).files;
+    
+    if (files && files.length) {
+        var reader = new FileReader();
+        reader.onload = function () {
+            (document.querySelector("#uploaded-background-image") as HTMLImageElement).src = 
+                reader.result as string;
+        }
+        reader.readAsDataURL(files[0]);
+    }
+}
+
+function setBackgroundImage(e: MouseEvent): void
+{
+    const image = (document.querySelector('#uploaded-background-image') as HTMLImageElement);
+
+    if(!image.complete || image.naturalWidth === 0)
+        throw new Error("Image isn't loaded yet");
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("Failed to get canvas context");
+
+    ctx.drawImage(image, 0, 0);
+
+    chrome.storage.local.set({'background': canvas.toDataURL('image/png')});
+    notyf.success(`Set new background image`);
+}
+
+function unsetBackgroundImage(e: MouseEvent): void
+{
+    chrome.storage.local.remove('background');
+    notyf.success('Cleared background image.');
 }
 
 function clearStoredWaApplications(e: MouseEvent): void

@@ -12,6 +12,7 @@
   "permissions": [
     "activeTab",
     "storage",
+    "unlimitedStorage",
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess"
   ],
