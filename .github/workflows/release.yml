@@ -67,11 +67,13 @@ jobs:
       - name: Generate release notes
         id: generate_release_notes
         run: |
-          # Get commit messages between previous tag and HEAD
+          # Get commits between previous tag and HEAD, filtering for PR titles
+          # When PRs are squashed, the commit message is the PR title
+          # We exclude commits made by github-actions[bot] (version bumps, etc.)
           if [ "${{ env.previous_tag }}" != "" ]; then
-            release_notes=$(git log ${{ env.previous_tag }}..HEAD --pretty=format:"- %s" --reverse)
+            release_notes=$(git log ${{ env.previous_tag }}..HEAD --pretty=format:"- %s" --reverse --author="^((?!github-actions\[bot\]).)*$" --perl-regexp | grep -v "^- Update manifest.json version to" | grep -v "^- Upgrade to .* by GitHub Actions")
           else
-            release_notes=$(git log --pretty=format:"- %s" --reverse)
+            release_notes=$(git log --pretty=format:"- %s" --reverse --author="^((?!github-actions\[bot\]).)*$" --perl-regexp | grep -v "^- Update manifest.json version to" | grep -v "^- Upgrade to .* by GitHub Actions")
           fi
           
           # Handle multiline output for GitHub Actions
