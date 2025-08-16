@@ -490,7 +490,18 @@
             const soundEnabled = await getStorageValue('moveSoundEnabled');
             if (soundEnabled !== false) { // Default to true if not set
                 const volumePercentage = await getStorageValue('moveSoundVolume') || 50;
-                const audio = new Audio(chrome.runtime.getURL('audio/move-success.wav'));
+                
+                // Check for custom sound first
+                const customSound = await getStorageValue('customMoveSound');
+                let audioSrc: string;
+                
+                if (customSound) {
+                    audioSrc = customSound; // Use custom sound data URL
+                } else {
+                    audioSrc = chrome.runtime.getURL('audio/move-success.wav'); // Use default sound
+                }
+                
+                const audio = new Audio(audioSrc);
                 audio.volume = volumePercentage / 100; // Convert percentage to 0-1 range
                 await audio.play();
             }

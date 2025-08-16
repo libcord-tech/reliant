@@ -133,6 +133,18 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <p>Volume: <input type="range" id="move-sound-volume" min="0" max="100" value="50">
 <span id="current-move-sound-volume">50</span>%</p>
 </fieldset>
+<fieldset>
+<legend>Custom Move Success Sound</legend>
+<p>Upload your own sound file to play when you successfully move to a different region.</p>
+<input type="file" id="new-custom-sound" accept="audio/*">
+<br/>
+<audio id="uploaded-custom-sound" controls style="max-width:60%; margin: 10px 0;"></audio>
+<br/>
+<input class="button" type="button" id="test-custom-sound" value="Test Sound">
+<input class="button" type="button" id="set-custom-sound" value="Set Custom Sound">
+<input class="button" type="button" id="unset-custom-sound" value="Remove Custom Sound">
+<p>Current: <b id="current-custom-sound-status">Default</b></p>
+</fieldset>
 <fieldset id="keys">
 <legend>Change Keys</legend>
 <p id="current-key"></p>
@@ -266,6 +278,10 @@ document.querySelector('#new-background-image').addEventListener('change', loadB
 document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
 document.querySelector('#move-sound-toggle').addEventListener('change', toggleMoveSound);
 document.querySelector('#move-sound-volume').addEventListener('input', setMoveSoundVolume);
+document.querySelector('#new-custom-sound').addEventListener('change', loadCustomSound);
+document.querySelector('#test-custom-sound').addEventListener('click', testCustomSound);
+document.querySelector('#set-custom-sound').addEventListener('click', setCustomSound);
+document.querySelector('#unset-custom-sound').addEventListener('click', unsetCustomSound);
 
 /*
  * Handlers
@@ -377,6 +393,60 @@ function unsetBackgroundImage(e: MouseEvent): void
 {
     chrome.storage.local.remove('background');
     notyf.success('Cleared background image.');
+}
+
+function loadCustomSound(e: Event): void
+{
+    var files = (e.target as HTMLInputElement).files;
+    
+    if (files && files.length) {
+        var reader = new FileReader();
+        reader.onload = function () {
+            (document.querySelector("#uploaded-custom-sound") as HTMLAudioElement).src = 
+                reader.result as string;
+        }
+        reader.readAsDataURL(files[0]);
+    }
+}
+
+function setCustomSound(e: MouseEvent): void
+{
+    const audio = (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement);
+
+    if(!audio.src)
+        throw new Error("No audio file loaded");
+    
+    chrome.storage.local.set({'customMoveSound': audio.src});
+    document.querySelector('#current-custom-sound-status').innerHTML = 'Custom';
+    notyf.success(`Set custom move success sound`);
+}
+
+function unsetCustomSound(e: MouseEvent): void
+{
+    chrome.storage.local.remove('customMoveSound');
+    document.querySelector('#current-custom-sound-status').innerHTML = 'Default';
+    (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement).src = '';
+    notyf.success('Removed custom sound. Using default sound.');
+}
+
+async function testCustomSound(e: MouseEvent): Promise<void>
+{
+    const audio = (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement);
+    
+    if(!audio.src) {
+        notyf.error('No audio file loaded to test');
+        return;
+    }
+    
+    try {
+        const volumePercentage = parseInt((document.querySelector('#move-sound-volume') as HTMLInputElement).value);
+        audio.volume = volumePercentage / 100;
+        await audio.play();
+        notyf.success('Playing test sound');
+    } catch (error) {
+        console.log('Failed to play test sound:', error);
+        notyf.error('Failed to play test sound');
+    }
 }
 
 function clearStoredWaApplications(e: MouseEvent): void
@@ -585,7 +655,8 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('endorsekeywords'),
             getCurrentKey('occupationmode'),
             getCurrentKey('moveSoundEnabled'),
-            getCurrentKey('moveSoundVolume')
+            getCurrentKey('moveSoundVolume'),
+            getCurrentKey('customMoveSound')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -597,6 +668,7 @@ chrome.storage.local.get('switchers', (result) => {
         const occupationMode = currentSettings[6] ?? false;
         const moveSoundEnabled = currentSettings[7] ?? false;
         const moveSoundVolume = currentSettings[8] ?? 50;
+        const customMoveSound = currentSettings[9];
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -613,6 +685,9 @@ chrome.storage.local.get('switchers', (result) => {
         
         (document.querySelector('#move-sound-volume') as HTMLInputElement).value = moveSoundVolume.toString();
         document.querySelector('#current-move-sound-volume').innerHTML = moveSoundVolume.toString();
+        
+        // Set custom sound status
+        document.querySelector('#current-custom-sound-status').innerHTML = customMoveSound ? 'Custom' : 'Default';
     }
 
     await displayCurrentKeys();
