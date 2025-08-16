@@ -57,30 +57,6 @@ jobs:
           new_version=$(jq -r '.version' package.json)
           echo "new_version=${new_version}" >> $GITHUB_ENV
 
-      - name: Get previous tag
-        id: get_previous_tag
-        run: |
-          # Get the previous tag, or use initial commit if no previous tag exists
-          previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          echo "previous_tag=${previous_tag}" >> $GITHUB_ENV
-
-      - name: Generate release notes
-        id: generate_release_notes
-        run: |
-          # Get commits between previous tag and HEAD, filtering for PR titles
-          # When PRs are squashed, the commit message is the PR title
-          # We exclude commits made by github-actions[bot] (version bumps, etc.)
-          if [ "${{ env.previous_tag }}" != "" ]; then
-            release_notes=$(git log ${{ env.previous_tag }}..HEAD --pretty=format:"- %s" --reverse --author="^((?!github-actions\[bot\]).)*$" --perl-regexp | grep -v "^- Update manifest.json version to" | grep -v "^- Upgrade to .* by GitHub Actions")
-          else
-            release_notes=$(git log --pretty=format:"- %s" --reverse --author="^((?!github-actions\[bot\]).)*$" --perl-regexp | grep -v "^- Update manifest.json version to" | grep -v "^- Upgrade to .* by GitHub Actions")
-          fi
-          
-          # Handle multiline output for GitHub Actions
-          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo "$release_notes" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Create zip of build
         run: zip -r reliant-release.zip build
 
@@ -92,7 +68,6 @@ jobs:
         with:
           tag_name: ${{ env.new_version }}
           release_name: ${{ env.new_version }}
-          body: ${{ env.RELEASE_NOTES }}
           draft: false
           prerelease: false
 
