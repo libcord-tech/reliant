@@ -175,8 +175,9 @@
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
             format: (matches) => formatLink(matches[1], 'nation') +
                 ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`,
-            handler: (matches) => {
+            handler: async (matches) => {
                 // (document.querySelector('#chasing-button') as HTMLInputElement).setAttribute('data-moveregion', matches[3]);
+                await playMoveSuccessSound();
             }
         },
         ADMISSION: {
@@ -816,7 +817,6 @@
                     else {
                         status.innerHTML = `Moved to ${moveRegion}`;
                         currentRegion.innerHTML = moveRegion;
-                        await playMoveSuccessSound();
                     }
                     (e.target as HTMLInputElement).value = 'Update Localid';
                 });
@@ -925,7 +925,6 @@
                     currentRegion.innerHTML = moveRegion;
                     document.querySelector('#wa-delegate').innerHTML = 'N/A';
                     document.querySelector('#last-wa-update').innerHTML = 'N/A';
-                    await playMoveSuccessSound();
                     // Wait for next keypress
                     await updateOccupationSequence('awaiting-localid');
                 }
@@ -1005,7 +1004,6 @@
                 else {
                     status.innerHTML = `Moved to ${moveRegion}`;
                     currentRegion.innerHTML = moveRegion;
-                    await playMoveSuccessSound();
                 }
                 (e.target as HTMLInputElement).value = 'Update Localid';
                 (e.target as HTMLInputElement).setAttribute('data-moveregion', '');
