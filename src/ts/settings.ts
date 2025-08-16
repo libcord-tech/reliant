@@ -124,6 +124,27 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <label for="occupation-mode-toggle">Enable Occupation Chasing Mode</label>
 <p>Current: <b id="current-occupation-mode">Disabled</b></p>
 </fieldset>
+<fieldset>
+<legend>Move Success Sound</legend>
+<p>When enabled, a notification sound will play when you successfully move to a different region.</p>
+<input type="checkbox" id="move-sound-toggle" checked>
+<label for="move-sound-toggle">Play sound on successful region move</label>
+<p>Current: <b id="current-move-sound-status">Enabled</b></p>
+<p>Volume: <input type="range" id="move-sound-volume" min="0" max="100" value="50">
+<span id="current-move-sound-volume">50</span>%</p>
+</fieldset>
+<fieldset>
+<legend>Custom Move Success Sound</legend>
+<p>Upload your own sound file to play when you successfully move to a different region.</p>
+<input type="file" id="new-custom-sound" accept="audio/*">
+<br/>
+<audio id="uploaded-custom-sound" controls style="max-width:60%; margin: 10px 0;"></audio>
+<br/>
+<input class="button" type="button" id="test-custom-sound" value="Test Sound">
+<input class="button" type="button" id="set-custom-sound" value="Set Custom Sound">
+<input class="button" type="button" id="unset-custom-sound" value="Remove Custom Sound">
+<p>Current: <b id="current-custom-sound-status">Default</b></p>
+</fieldset>
 <fieldset id="keys">
 <legend>Change Keys</legend>
 <p id="current-key"></p>
@@ -255,6 +276,12 @@ document.querySelector('#set-background-image').addEventListener('click', setBac
 document.querySelector('#unset-background-image').addEventListener('click', unsetBackgroundImage);
 document.querySelector('#new-background-image').addEventListener('change', loadBackgroundImage);
 document.querySelector('#occupation-mode-toggle').addEventListener('change', toggleOccupationMode);
+document.querySelector('#move-sound-toggle').addEventListener('change', toggleMoveSound);
+document.querySelector('#move-sound-volume').addEventListener('input', setMoveSoundVolume);
+document.querySelector('#new-custom-sound').addEventListener('change', loadCustomSound);
+document.querySelector('#test-custom-sound').addEventListener('click', testCustomSound);
+document.querySelector('#set-custom-sound').addEventListener('click', setCustomSound);
+document.querySelector('#unset-custom-sound').addEventListener('click', unsetCustomSound);
 
 /*
  * Handlers
@@ -368,6 +395,60 @@ function unsetBackgroundImage(e: MouseEvent): void
     notyf.success('Cleared background image.');
 }
 
+function loadCustomSound(e: Event): void
+{
+    var files = (e.target as HTMLInputElement).files;
+    
+    if (files && files.length) {
+        var reader = new FileReader();
+        reader.onload = function () {
+            (document.querySelector("#uploaded-custom-sound") as HTMLAudioElement).src = 
+                reader.result as string;
+        }
+        reader.readAsDataURL(files[0]);
+    }
+}
+
+function setCustomSound(e: MouseEvent): void
+{
+    const audio = (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement);
+
+    if(!audio.src)
+        throw new Error("No audio file loaded");
+    
+    chrome.storage.local.set({'customMoveSound': audio.src});
+    document.querySelector('#current-custom-sound-status').innerHTML = 'Custom';
+    notyf.success(`Set custom move success sound`);
+}
+
+function unsetCustomSound(e: MouseEvent): void
+{
+    chrome.storage.local.remove('customMoveSound');
+    document.querySelector('#current-custom-sound-status').innerHTML = 'Default';
+    (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement).src = '';
+    notyf.success('Removed custom sound. Using default sound.');
+}
+
+async function testCustomSound(e: MouseEvent): Promise<void>
+{
+    const audio = (document.querySelector('#uploaded-custom-sound') as HTMLAudioElement);
+    
+    if(!audio.src) {
+        notyf.error('No audio file loaded to test');
+        return;
+    }
+    
+    try {
+        const volumePercentage = parseInt((document.querySelector('#move-sound-volume') as HTMLInputElement).value);
+        audio.volume = volumePercentage / 100;
+        await audio.play();
+        notyf.success('Playing test sound');
+    } catch (error) {
+        console.log('Failed to play test sound:', error);
+        notyf.error('Failed to play test sound');
+    }
+}
+
 function clearStoredWaApplications(e: MouseEvent): void
 {
     chrome.storage.local.set({'switchers': []});
@@ -436,6 +517,22 @@ async function toggleOccupationMode(e: Event): Promise<void>
     await setStorageValue('occupationsequence', 'ready');
     document.querySelector('#current-occupation-mode').innerHTML = isEnabled ? 'Enabled' : 'Disabled';
     notyf.success(`Occupation mode ${isEnabled ? 'enabled' : 'disabled'}`);
+}
+
+async function toggleMoveSound(e: Event): Promise<void>
+{
+    const isEnabled = (e.target as HTMLInputElement).checked;
+    await setStorageValue('moveSoundEnabled', isEnabled);
+    document.querySelector('#current-move-sound-status').innerHTML = isEnabled ? 'Enabled' : 'Disabled';
+    notyf.success(`Move sound ${isEnabled ? 'enabled' : 'disabled'}`);
+}
+
+async function setMoveSoundVolume(e: Event): Promise<void>
+{
+    const volume = parseInt((e.target as HTMLInputElement).value);
+    await setStorageValue('moveSoundVolume', volume);
+    document.querySelector('#current-move-sound-volume').innerHTML = volume.toString();
+    // notyf.success(`Move sound volume set to ${volume}%`);
 }
 
 chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
@@ -556,7 +653,10 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('blockedregions'),
             getCurrentKey('dossierkeywords'),
             getCurrentKey('endorsekeywords'),
-            getCurrentKey('occupationmode')
+            getCurrentKey('occupationmode'),
+            getCurrentKey('moveSoundEnabled'),
+            getCurrentKey('moveSoundVolume'),
+            getCurrentKey('customMoveSound')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -566,6 +666,9 @@ chrome.storage.local.get('switchers', (result) => {
         const dossierKeywords = currentSettings[4] ?? [];
         const endorseKeywords = currentSettings[5] ?? [];
         const occupationMode = currentSettings[6] ?? false;
+        const moveSoundEnabled = currentSettings[7] ?? false;
+        const moveSoundVolume = currentSettings[8] ?? 50;
+        const customMoveSound = currentSettings[9];
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -576,6 +679,15 @@ chrome.storage.local.get('switchers', (result) => {
         
         (document.querySelector('#occupation-mode-toggle') as HTMLInputElement).checked = Boolean(occupationMode);
         document.querySelector('#current-occupation-mode').innerHTML = occupationMode ? 'Enabled' : 'Disabled';
+        
+        (document.querySelector('#move-sound-toggle') as HTMLInputElement).checked = Boolean(moveSoundEnabled);
+        document.querySelector('#current-move-sound-status').innerHTML = moveSoundEnabled ? 'Enabled' : 'Disabled';
+        
+        (document.querySelector('#move-sound-volume') as HTMLInputElement).value = moveSoundVolume.toString();
+        document.querySelector('#current-move-sound-volume').innerHTML = moveSoundVolume.toString();
+        
+        // Set custom sound status
+        document.querySelector('#current-custom-sound-status').innerHTML = customMoveSound ? 'Custom' : 'Default';
     }
 
     await displayCurrentKeys();

@@ -114,6 +114,7 @@ async function setDefaultStorageValues(): Promise<void>
         { key: 'raiderjp', value: 'suspicious'},
         { key: 'occupationmode', value: false },
         { key: 'occupationsequence', value: 'ready' },
+        { key: 'moveSoundVolume', value: 50 },
     ];
 
     for (const { key, value } of defaultValues) {

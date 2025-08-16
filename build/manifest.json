@@ -32,6 +32,16 @@
     "default_title": "Reliant",
     "default_popup": "html/popup.html"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "audio/*"
+      ],
+      "matches": [
+        "https://*.nationstates.net/*"
+      ]
+    }
+  ],
   "content_scripts": [
     {
       "matches": [

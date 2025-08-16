@@ -175,8 +175,9 @@
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
             format: (matches) => formatLink(matches[1], 'nation') +
                 ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`,
-            handler: (matches) => {
+            handler: async (matches) => {
                 // (document.querySelector('#chasing-button') as HTMLInputElement).setAttribute('data-moveregion', matches[3]);
+                await playMoveSuccessSound();
             }
         },
         ADMISSION: {
@@ -458,6 +459,7 @@
     let nationsTracked: string[] = await getStorageValue('trackednations') || [];
     let nationsEndorsed: string[] = [];
     let moveCounts: object = {};
+    let lastMoveSoundTime: number = 0;
 
     /*
      * Helpers
@@ -482,6 +484,43 @@
         // while we're getting the chk, we may as well check the current nation too
         let nationNameRegex = new RegExp('data-nname="([A-Za-z0-9_-]+?)">');
         await setStorageValue('currentwa', nationNameRegex.exec(response)[1]);
+    }
+
+    async function playMoveSuccessSound(): Promise<void>
+    {
+        try {
+            // Debounce logic: only play if enough time has passed since last play
+            const currentTime = Date.now();
+            const debounceDelay = 2000; // 2 seconds
+            
+            if (currentTime - lastMoveSoundTime < debounceDelay) {
+                return; // Skip playing sound if within debounce window
+            }
+            
+            const soundEnabled = await getStorageValue('moveSoundEnabled');
+            if (soundEnabled !== false) { // Default to true if not set
+                const volumePercentage = await getStorageValue('moveSoundVolume') || 50;
+                
+                // Check for custom sound first
+                const customSound = await getStorageValue('customMoveSound');
+                let audioSrc: string;
+                
+                if (customSound) {
+                    audioSrc = customSound; // Use custom sound data URL
+                } else {
+                    audioSrc = chrome.runtime.getURL('audio/move-success.wav'); // Use default sound
+                }
+                
+                const audio = new Audio(audioSrc);
+                audio.volume = volumePercentage / 100; // Convert percentage to 0-1 range
+                await audio.play();
+                
+                // Update the last play time after successfully playing
+                lastMoveSoundTime = currentTime;
+            }
+        } catch (error) {
+            console.log('Failed to play move success sound:', error);
+        }
     }
 
     /*
