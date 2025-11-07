@@ -20,7 +20,7 @@
         for (let i = 0; i !== a.length; i++) {
             let link: string = (a[i] as HTMLAnchorElement).href;
             if (link.indexOf('join_WA') !== -1) {
-                const switcherRegex: RegExp = new RegExp(`nation=([A-Za-z0-9_-]+?)&appid=([0-9]+)`, 'g');
+                const switcherRegex: RegExp = new RegExp(`nation=([A-Za-z0-9_-]+)[?&]appid=([A-Za-z0-9_-]+)`, 'g');
                 console.log(link);
                 const match: string[] = switcherRegex.exec(link);
                 const newSwitcher: Switcher = {

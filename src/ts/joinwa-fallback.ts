@@ -15,7 +15,7 @@
     }
 
     if (urlParameters['page'] === 'join_WA') {
-        const switcherRegex: RegExp = new RegExp(`nation=([A-Za-z0-9_-]+?)&appid=([0-9]+)`, 'g');
+        const switcherRegex: RegExp = new RegExp(`nation=([A-Za-z0-9_-]+)[?&]appid=([A-Za-z0-9_-]+)`, 'g');
         const match = switcherRegex.exec(document.URL);
         const newSwitcher: Switcher = {
             name: match[1],
