@@ -10,7 +10,6 @@
     "32": "icons/icon32.png"
   },
   "permissions": [
-    "activeTab",
     "storage",
     "unlimitedStorage",
     "declarativeNetRequest",
