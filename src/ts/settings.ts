@@ -535,11 +535,43 @@ async function setMoveSoundVolume(e: Event): Promise<void>
     // notyf.success(`Move sound volume set to ${volume}%`);
 }
 
-chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
+chrome.storage.local.get(['prepswitchers', 'password', 'useragent'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
     const prepSwitchers = result.prepswitchers ?? [];
+    const userAgent = result.useragent ?? '';
     const password = result.password || '';
+
+    function submitSwitcherLogin(switcherName: string): void
+    {
+        const form = document.createElement('form');
+        form.action = `/page=un?script=reliant_${RELIANT_VERSION}_by_Haku_in_use_by_${userAgent}&userclick=${Date.now()}`;
+        form.method = 'post';
+        form.target = '_blank';
+        form.style.display = 'none';
+
+        const loggingInput = document.createElement('input');
+        loggingInput.type = 'hidden';
+        loggingInput.name = 'logging_in';
+        loggingInput.value = '1';
+
+        const nationInput = document.createElement('input');
+        nationInput.type = 'hidden';
+        nationInput.name = 'nation';
+        nationInput.value = switcherName;
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'password';
+        passwordInput.value = password;
+
+        form.appendChild(loggingInput);
+        form.appendChild(nationInput);
+        form.appendChild(passwordInput);
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+    }
 
     // Create a document fragment
     const fragment = document.createDocumentFragment();
@@ -549,9 +581,13 @@ chrome.storage.local.get(['prepswitchers', 'password'], (result) =>
 
         // Create anchor element
         const anchor = document.createElement('a');
-        anchor.href = `/page=un?nation=${switcherName}&password=${password}&logging_in=1`;
+        anchor.href = `/page=un?nation=${switcherName}&logging_in=1`;
         anchor.target = '_blank';
         anchor.textContent = switcherName;
+        anchor.addEventListener('click', (event) => {
+            event.preventDefault();
+            submitSwitcherLogin(switcherName);
+        });
 
         // Append anchor to the fragment
         fragment.appendChild(anchor);
