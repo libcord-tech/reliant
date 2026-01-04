@@ -242,6 +242,10 @@ Current:
 <input class="button" type="button" id="set-key" value="Set">
 </fieldset>
 </form>
+<p><strong>Login Landing Page</strong></p>
+<input type="text" id="login-landing-page">
+<input class="button" type="button" id="set-login-landing-page" value="Set">
+<p>Current: <b id="current-login-landing-page"></b></p>
 <h2>Current Prep Switcher Set</h2>
 <p id="current-switcher-set"></p>
 <h2>Currently Stored Applications</h2>
@@ -266,6 +270,7 @@ document.querySelector('#set-jump-point').addEventListener('click', setJumpPoint
 document.querySelector('#set-ro-name').addEventListener('click', setRoName);
 document.querySelector('#set-max-happenings').addEventListener('click', setMaxHappeningsCount);
 document.querySelector('#set-switchers').addEventListener('click', setSwitchers);
+document.querySelector('#set-login-landing-page').addEventListener('click', setLoginLandingPage);
 document.querySelector('#set-password').addEventListener('click', setPassword);
 document.querySelector('#clear-wa-apps').addEventListener('click', clearStoredWaApplications);
 document.querySelector('#set-blocked-regions').addEventListener('click', setBlockedRegions);
@@ -353,6 +358,27 @@ function setPassword(e: MouseEvent): void
     const password = (document.querySelector('#my-password') as HTMLInputElement).value;
     chrome.storage.local.set({'password': password});
     notyf.success(`Set password to ${password}`);
+}
+
+function normalizeLandingPage(value: string | null | undefined): string
+{
+    if (!value) return '';
+    return value.trim().replace(/^\//, '').split('?')[0].trim();
+}
+
+function setLoginLandingPage(e: MouseEvent): void
+{
+    const rawLandingPage = (document.querySelector('#login-landing-page') as HTMLInputElement).value;
+    const landingPage = normalizeLandingPage(rawLandingPage);
+
+    if (!landingPage) {
+        chrome.storage.local.remove('loginlandingpage');
+        notyf.success('Cleared login landing page. Using default page=un.');
+        return;
+    }
+
+    chrome.storage.local.set({'loginlandingpage': landingPage});
+    notyf.success(`Set login landing page to ${landingPage}`);
 }
 
 function loadBackgroundImage(e: Event): void
@@ -535,17 +561,18 @@ async function setMoveSoundVolume(e: Event): Promise<void>
     // notyf.success(`Move sound volume set to ${volume}%`);
 }
 
-chrome.storage.local.get(['prepswitchers', 'password', 'useragent'], (result) =>
+chrome.storage.local.get(['prepswitchers', 'password', 'useragent', 'loginlandingpage'], (result) =>
 {
     const currentSwitcherSet = document.querySelector('#current-switcher-set');
     const prepSwitchers = result.prepswitchers ?? [];
     const userAgent = result.useragent ?? '';
     const password = result.password || '';
+    const landingPage = normalizeLandingPage(result.loginlandingpage) || 'page=un';
 
     function submitSwitcherLogin(switcherName: string): void
     {
         const form = document.createElement('form');
-        form.action = `/page=un?script=reliant_${RELIANT_VERSION}_by_Haku_in_use_by_${userAgent}&userclick=${Date.now()}`;
+        form.action = `/${landingPage}?script=reliant_${RELIANT_VERSION}_by_Haku_in_use_by_${userAgent}&userclick=${Date.now()}`;
         form.method = 'post';
         form.target = '_blank';
         form.style.display = 'none';
@@ -581,7 +608,7 @@ chrome.storage.local.get(['prepswitchers', 'password', 'useragent'], (result) =>
 
         // Create anchor element
         const anchor = document.createElement('a');
-        anchor.href = `/page=un?nation=${switcherName}&logging_in=1`;
+        anchor.href = `/${landingPage}?nation=${switcherName}&logging_in=1`;
         anchor.target = '_blank';
         anchor.textContent = switcherName;
         anchor.addEventListener('click', (event) => {
@@ -692,7 +719,8 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('occupationmode'),
             getCurrentKey('moveSoundEnabled'),
             getCurrentKey('moveSoundVolume'),
-            getCurrentKey('customMoveSound')
+            getCurrentKey('customMoveSound'),
+            getCurrentKey('loginlandingpage')
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -705,6 +733,7 @@ chrome.storage.local.get('switchers', (result) => {
         const moveSoundEnabled = currentSettings[7] ?? false;
         const moveSoundVolume = currentSettings[8] ?? 50;
         const customMoveSound = currentSettings[9];
+        const loginLandingPage = normalizeLandingPage(currentSettings[10]) || 'page=un';
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -724,6 +753,9 @@ chrome.storage.local.get('switchers', (result) => {
         
         // Set custom sound status
         document.querySelector('#current-custom-sound-status').innerHTML = customMoveSound ? 'Custom' : 'Default';
+
+        (document.querySelector('#login-landing-page') as HTMLInputElement).value = loginLandingPage;
+        document.querySelector('#current-login-landing-page').innerHTML = loginLandingPage;
     }
 
     await displayCurrentKeys();
