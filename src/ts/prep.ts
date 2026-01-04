@@ -101,6 +101,7 @@
                     formData.set('localid', localId);
                     formData.set('region_name', moveRegion);
                     formData.set('move_region', '1');
+                    formData.set('confirm_move', '1');
                     let response = await makeAjaxQuery('/page=change_region', 'POST', formData);
                     if (response.indexOf('This request failed a security check.') !== -1)
                         document.querySelector('#status').innerHTML = `Failed to move to ${moveRegion}.`;
