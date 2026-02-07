@@ -184,7 +184,7 @@ function getChk(page?: string): void
     if (chk)
         chrome.storage.local.set({'chk': chk.value});
     else if (page) {
-        const chkRegex: RegExp = new RegExp('<input type="hidden" name="chk" value="([A-Za-z0-9]+?)">');
+        const chkRegex: RegExp = new RegExp('<input type="hidden" name="chk" value="([A-Za-z0-9_-]+?)">');
         const match: string[] = chkRegex.exec(page);
         chrome.storage.local.set({'chk': match[1]});
     }
