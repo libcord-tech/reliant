@@ -41,27 +41,31 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Increment version and push tag
+      - name: Increment version and manifest
         id: increment_version
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          new_version=$(npm version patch -m "Upgrade to %s by GitHub Actions")
-          echo "new_version=${new_version}" >> $GITHUB_ENV
-
-      - name: Update manifest version
-        run: |
-          new_version=$(jq -r '.version' package.json)
-          jq --arg new_version "$new_version" '.version = $new_version' build/manifest.json > build/manifest.tmp && mv build/manifest.tmp build/manifest.json
-          git add build/manifest.json
-          git commit -m "Update manifest.json version to ${new_version}"
+          
+          # Increment version in package.json without committing
+          npm version patch --no-git-tag-version
+          
+          # Get the new version
+          NEW_VERSION=$(jq -r '.version' package.json)
+          
+          # Update manifest.json
+          jq --arg ver "$NEW_VERSION" '.version = $ver' build/manifest.json > build/manifest.tmp && mv build/manifest.tmp build/manifest.json
+          
+          # Commit both changes together
+          git add package.json build/manifest.json
+          git commit -m "Upgrade to ${NEW_VERSION} by GitHub Actions"
+          
+          # Tag and push
+          git tag "${NEW_VERSION}"
           git push origin main --follow-tags
-
-      - name: Extract version
-        id: extract_version
-        run: |
-          new_version=$(jq -r '.version' package.json)
-          echo "new_version=${new_version}" >> $GITHUB_ENV
+          
+          # Set version for subsequent steps
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_ENV
 
       - name: Create zip of build
         run: zip -r reliant-release.zip build
