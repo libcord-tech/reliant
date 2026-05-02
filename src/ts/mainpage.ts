@@ -483,7 +483,9 @@
         getChk(response);
         // while we're getting the chk, we may as well check the current nation too
         let nationNameRegex = new RegExp('data-nname="([A-Za-z0-9_-]+?)">');
+        let regionNameRegex = new RegExp('<li id="panelregionbar"><a href="region=([A-Za-z0-9_-]+?)">')
         await setStorageValue('currentwa', nationNameRegex.exec(response)[1]);
+        currentRegion.innerHTML = regionNameRegex.exec(response)[1];
     }
 
     async function playMoveSuccessSound(): Promise<void>
@@ -1178,7 +1180,7 @@
 
     async function checkCurrentRegion(e: MouseEvent): Promise<void>
     {
-        let response = await makeAjaxQuery('/region=artificial_solar_system', 'GET');
+        let response = await makeAjaxQuery('/page=upload_flag', 'GET');
         let responseElement = document.createRange().createContextualFragment(response);
         let regionHref = (responseElement.querySelector('#panelregionbar > a') as HTMLAnchorElement).href;
         currentRegion.innerHTML = new RegExp('region=([A-Za-z0-9_]+)').exec(regionHref)[1];
