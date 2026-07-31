@@ -2,16 +2,24 @@
 {
     async function getNumSwitchers(): Promise<number>
     {
-        return new Promise((resolve) =>
+        const result = await new Promise<{ switchers?: Switcher[] }>((resolve) =>
         {
-            chrome.storage.local.get('switchers', (result) =>
-            {
-                if (result.switchers)
-                    resolve(result.switchers.length);
-                else
-                    resolve(0);
-            });
+            chrome.storage.local.get('switchers', resolve);
         });
+        const storedSwitchers = Array.isArray(result.switchers) ? result.switchers : [];
+        const now = Date.now();
+        const switchers = storedSwitchers
+            .filter((switcher) => switcher && typeof switcher.name === 'string' && typeof switcher.appid === 'string')
+            .map((switcher) =>
+            {
+                const expiresAt = Number(switcher.expiresAt);
+                return Number.isFinite(expiresAt) ? switcher :
+                    { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+            })
+            .filter((switcher) => Number(switcher.expiresAt) > now);
+        if (JSON.stringify(switchers) !== JSON.stringify(storedSwitchers))
+            await chrome.storage.local.set({ switchers });
+        return switchers.length;
     }
 
     async function getCurrentWa(): Promise<string>

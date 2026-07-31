@@ -9,6 +9,7 @@ interface Switcher
 {
     name: string;
     appid: string;
+    expiresAt?: number;
 }
 
 /*

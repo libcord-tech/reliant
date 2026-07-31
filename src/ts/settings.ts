@@ -629,7 +629,19 @@ chrome.storage.local.get(['prepswitchers', 'password', 'useragent', 'loginlandin
 
 chrome.storage.local.get('switchers', (result) => {
     const currentApplications = document.querySelector('#current-stored-applications');
-    const applications = result.switchers ?? []; // Assuming Switcher[] is inferred or defined elsewhere
+    const storedApplications: Switcher[] = Array.isArray(result.switchers) ? result.switchers : [];
+    const now = Date.now();
+    const applications = storedApplications
+        .filter((switcher) => switcher && typeof switcher.name === 'string' && typeof switcher.appid === 'string')
+        .map((switcher) =>
+        {
+            const expiresAt = Number(switcher.expiresAt);
+            return Number.isFinite(expiresAt) ? switcher :
+                { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+        })
+        .filter((switcher) => Number(switcher.expiresAt) > now);
+    if (JSON.stringify(applications) !== JSON.stringify(storedApplications))
+        chrome.storage.local.set({ switchers: applications });
 
     // Create a document fragment
     const fragment = document.createDocumentFragment();
@@ -640,8 +652,12 @@ chrome.storage.local.get('switchers', (result) => {
         // Create a paragraph element
         const p = document.createElement('p');
 
-        // Set its innerHTML to include the name and ID
-        p.innerHTML = `Name: ${application.name}<br>ID: ${application.appid}`;
+        const expiresAt = Number(application.expiresAt);
+        const expiration = Number.isFinite(expiresAt) ?
+            new Date(expiresAt).toLocaleString() : 'Unknown';
+
+        // Set its innerHTML to include the name, ID, expiration date and time
+        p.innerHTML = `Name: ${application.name}<br>ID: ${application.appid}<br>Expires: ${expiration}`;
         
         // Append the paragraph to the fragment
         fragment.appendChild(p);
