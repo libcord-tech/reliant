@@ -203,7 +203,24 @@
             });
         } else if (value === 'Admit on Next Switcher') {
             chrome.storage.local.get('switchers', async (result) => {
-                let switchers: Switcher[] = result.switchers;
+                const storedApplications: Switcher[] = result.switchers ?? [];
+                const now = Date.now();
+                let migrated = false;
+                let switchers = storedApplications
+                    .map((switcher) =>
+                    {
+                        if (switcher.expiresAt !== undefined)
+                            return switcher;
+                        migrated = true;
+                        return { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+                    })
+                    .filter((switcher) => switcher.expiresAt! > now);
+                if (migrated || switchers.length !== storedApplications.length)
+                    await chrome.storage.local.set({ switchers });
+                if (!switchers.length) {
+                    regionStatus.innerHTML = 'No switchers stored.';
+                    return;
+                }
                 let formData = new FormData();
                 formData.set('nation', switchers[0].name);
                 formData.set('appid', switchers[0].appid);
@@ -220,14 +237,14 @@
                     document.body.removeChild(copyText);*/
                     updateChk(response);
                     switchers.shift();
-                    chrome.storage.local.set({'switchers': switchers});
+                    await chrome.storage.local.set({ switchers });
                     actionButton.setAttribute('disabled', '');
                 } else if (response.indexOf('Another WA member nation is currently using the same email address') !== -1)
                     regionStatus.innerHTML = `Failed to admit on ${switchers[0].name}. A nation is already in the WA.`;
                 else {
                     regionStatus.innerHTML = `Failed to admit to the WA on ${switchers[0].name}. Invalid application.`;
                     switchers.shift();
-                    chrome.storage.local.set({'switchers': switchers});
+                    await chrome.storage.local.set({ switchers });
                 }
             });
         }
