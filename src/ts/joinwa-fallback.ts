@@ -1,17 +1,31 @@
 (() =>
 {
-    function addSwitcher(newSwitcher: Switcher): void
+    async function addSwitcher(newSwitcher: Switcher): Promise<void>
     {
-        chrome.storage.local.get('switchers', (result) =>
-        {
-            let switchers: Switcher[] = [];
-            if (typeof result.switchers !== 'undefined')
-                switchers = result.switchers;
-            if (!(switchers.some(switcher => switcher.name === newSwitcher.name))) {
-                switchers.push(newSwitcher);
-                chrome.storage.local.set({'switchers': switchers});
-            }
+        const storedSwitchers: Switcher[] = await getStorageValue('switchers') ?? [];
+        const now = Date.now();
+        let migrated = false;
+        const switchers = storedSwitchers
+            .map((switcher) =>
+            {
+                if (switcher.expiresAt !== undefined)
+                    return switcher;
+                migrated = true;
+                return { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+            })
+            .filter((switcher) => switcher.expiresAt! > now);
+        if (migrated || switchers.length !== storedSwitchers.length)
+            await setStorageValue('switchers', switchers);
+
+        if (switchers.some((switcher) => canonicalize(switcher.name) === canonicalize(newSwitcher.name)))
+            return;
+
+        switchers.push({
+            name: newSwitcher.name,
+            appid: newSwitcher.appid,
+            expiresAt: Date.now() + 28 * 24 * 60 * 60 * 1000,
         });
+        await setStorageValue('switchers', switchers);
     }
 
     if (urlParameters['page'] === 'join_WA') {
@@ -21,6 +35,6 @@
             name: match[1],
             appid: match[2]
         };
-        addSwitcher(newSwitcher);
+        void addSwitcher(newSwitcher);
     }
 })();

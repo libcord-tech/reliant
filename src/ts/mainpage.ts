@@ -549,44 +549,57 @@
         });
     }
 
-    function admitWA(e: MouseEvent): void
+    async function admitWA(e: MouseEvent): Promise<void>
     {
-        chrome.storage.local.get('switchers', async (result) =>
-        {
-            // storedswitchers is a list of nation, appid objects
-            (document.querySelector('#chasing-button') as HTMLInputElement).value = 'Refresh';
-            (document.querySelector('#move-to-jp') as HTMLInputElement).value = 'Move to JP';
-            currentRegion.innerHTML = 'N/A';
-            document.querySelector('#wa-delegate').innerHTML = 'N/A';
-            document.querySelector('#last-wa-update').innerHTML = 'N/A';
-            nationsToEndorse.innerHTML = '';
-            nationsToDossier.innerHTML = '';
-            nationsEndorsed = [];
+        const storedValue = await getStorageValue('switchers');
+        const storedApplications: Switcher[] = storedValue ?? [];
+        const now = Date.now();
+        let migrated = false;
+        const storedSwitchers = storedApplications
+            .map((switcher) =>
+            {
+                if (switcher.expiresAt !== undefined)
+                    return switcher;
+                migrated = true;
+                return { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+            })
+            .filter((switcher) => switcher.expiresAt! > now);
+        if (migrated || storedSwitchers.length !== storedApplications.length)
+            await setStorageValue('switchers', storedSwitchers);
+        if (!storedSwitchers.length) {
+            status.innerHTML = 'No switchers stored.';
+            return;
+        }
 
-            let storedSwitchers: Switcher[] = result.switchers;
-            if (typeof storedSwitchers === 'undefined')
-                status.innerHTML = 'No switchers stored.';
-            let formData = new FormData();
-            formData.set('nation', storedSwitchers[0].name);
-            formData.set('appid', storedSwitchers[0].appid);
-            let response = await makeAjaxQuery('/cgi-bin/join_un.cgi', 'POST', formData, true);
-            if (response.indexOf('Welcome to the World Assembly, new member') !== -1) {
-                freshlyAdmitted = true;
-                status.innerHTML = `Admitted to the WA on ${storedSwitchers[0].name}.`;
-                await chrome.storage.local.set({'currentwa': storedSwitchers[0].name});
-                nationsTracked = [];
-                await chrome.storage.local.set({ trackednations: [] });
-                getChk(response);
-                storedSwitchers.shift();
-            }
-            else if (response.indexOf('Another WA member nation is currently using the same email address') !== -1)
-                status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (nation already in WA).`;
-            else {
-                status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (invalid application).`;
-                storedSwitchers.shift();
-            }
-            chrome.storage.local.set({'switchers': storedSwitchers});
-        });
+        (document.querySelector('#chasing-button') as HTMLInputElement).value = 'Refresh';
+        (document.querySelector('#move-to-jp') as HTMLInputElement).value = 'Move to JP';
+        currentRegion.innerHTML = 'N/A';
+        document.querySelector('#wa-delegate').innerHTML = 'N/A';
+        document.querySelector('#last-wa-update').innerHTML = 'N/A';
+        nationsToEndorse.innerHTML = '';
+        nationsToDossier.innerHTML = '';
+        nationsEndorsed = [];
+
+        let formData = new FormData();
+        formData.set('nation', storedSwitchers[0].name);
+        formData.set('appid', storedSwitchers[0].appid);
+        let response = await makeAjaxQuery('/cgi-bin/join_un.cgi', 'POST', formData, true);
+        if (response.indexOf('Welcome to the World Assembly, new member') !== -1) {
+            freshlyAdmitted = true;
+            status.innerHTML = `Admitted to the WA on ${storedSwitchers[0].name}.`;
+            await chrome.storage.local.set({'currentwa': storedSwitchers[0].name});
+            nationsTracked = [];
+            await chrome.storage.local.set({ trackednations: [] });
+            getChk(response);
+            storedSwitchers.shift();
+        }
+        else if (response.indexOf('Another WA member nation is currently using the same email address') !== -1)
+            status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (nation already in WA).`;
+        else {
+            status.innerHTML = `Error admitting to the WA on ${storedSwitchers[0].name} (invalid application).`;
+            storedSwitchers.shift();
+        }
+        await setStorageValue('switchers', storedSwitchers);
     }
 
     function refreshEndorse(e: MouseEvent): void
@@ -1378,14 +1391,24 @@
      * Initialization
      */
 
-    chrome.storage.local.get(['switchers', 'currentwa', 'occupationmode', 'occupationsequence'], (result) =>
+    const storedValue = await getStorageValue('switchers');
+    const storedApplications: Switcher[] = storedValue ?? [];
+    const now = Date.now();
+    let migrated = false;
+    const activeApplications = storedApplications
+        .map((switcher) =>
+        {
+            if (switcher.expiresAt !== undefined)
+                return switcher;
+            migrated = true;
+            return { ...switcher, expiresAt: now + 28 * 24 * 60 * 60 * 1000 };
+        })
+        .filter((switcher) => switcher.expiresAt! > now);
+    if (migrated || activeApplications.length !== storedApplications.length)
+        await setStorageValue('switchers', activeApplications);
+    chrome.storage.local.get(['currentwa', 'occupationmode', 'occupationsequence'], (result) =>
     {
-        try {
-            document.querySelector('#num-switchers').innerHTML = result.switchers.length as string;
-        } catch(e) {
-            // no wa links in storage, do nothing
-            if (e instanceof TypeError) {}
-        }
+        document.querySelector('#num-switchers').innerHTML = String(activeApplications.length);
 
         updateWANationDisplay(currentWANation, result.currentwa || 'N/A');
         
