@@ -141,6 +141,7 @@
                 <div id="world-happenings-container">
                     <span class="header" id="world-happenings-header">World Happenings</span>
                     <input type="button" class="ajaxbutton" id="update-world-happenings" value="Update">
+                    <input type="button" id="track-world-members" value="Track Admits">
                     <ul class="information" id="world-happenings">
                     </ul>
                 </div>
@@ -159,21 +160,30 @@
         time: string;
         id: string;
         str: string;
+        buckets: string[];
     }
 
 // Interface for our event patterns
     interface EventPattern {
         regex: RegExp;
-        format: (matches: RegExpMatchArray) => string;
+        format: (matches: RegExpMatchArray, buckets: string[]) => string;
         // Add optional handler for additional processing
         handler?: (matches: RegExpMatchArray) => void;
+    }
+
+    const extractRegion = (buckets: string[]): string => {
+        for (const bucket of buckets) {
+            if (bucket.startsWith("region:"))
+                return bucket.slice(7);
+        }
+        return "[unknown]";
     }
 
 // Event patterns configuration
     const eventPatterns: Record<string, EventPattern> = {
         RELOCATION: {
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
-            format: (matches) => formatLink(matches[1], 'nation') +
+            format: (matches, _) => formatLink(matches[1], 'nation') +
                 ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`,
             handler: async (matches) => {
                 // (document.querySelector('#chasing-button') as HTMLInputElement).setAttribute('data-moveregion', matches[3]);
@@ -182,23 +192,23 @@
         },
         ADMISSION: {
             regex: /@@([^@]+)@@ was admitted to the World Assembly/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} was admitted to the World Assembly`
+            format: (matches, buckets) => `${formatLink(matches[1], 'nation')} was admitted to the World Assembly in ${formatLink(extractRegion(buckets), 'region')}`,
         },
         ENDORSEMENT: {
             regex: /@@([^@]+)@@ endorsed @@([^@]+)@@/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`
         },
         WITHDRAW_ENDORSEMENT: {
             regex: /@@([^@]+)@@ withdrew its endorsement from @@([^@]+)@@/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`
         },
         RESIGN_WA: {
             regex: /@@([^@]+)@@ resigned from the World Assembly/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} resigned from the World Assembly`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} resigned from the World Assembly`
         },
         INFLUENCE: {
             regex: /@@([^@]+)@@'s influence in %%([^@]+)%% rose from "[^@]+" to "[^@]+"/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`,
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`,
             handler: async (matches) => {
                 // Check if this is the current WA nation updating
                 const updatedNation = matches[1];
@@ -222,7 +232,7 @@
         },
         WA_DELEGATE: {
             regex: /@@([^@]+)@@ became WA Delegate of %%([^%]+)%%/,
-            format: (matches) => `${formatLink(matches[1], 'nation')} became WA Delegate of ${formatLink(matches[2], 'region')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} became WA Delegate of ${formatLink(matches[2], 'region')}`
         }
     };
 
@@ -278,7 +288,7 @@
             for (const pattern of Object.values(eventPatterns)) {
                 const match = data.str.match(pattern.regex);
                 if (match) {
-                    const reportElement = appendReport(pattern.format(match));
+                    const reportElement = appendReport(pattern.format(match, data.buckets));
                     // Move region handler
                     if (pattern.handler) {
                         pattern.handler(match);
@@ -410,6 +420,10 @@
         } else {
             // lol
             url += `nation:haku`;
+        }
+        const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
+        if (trackWorldMembers) {
+            url += `+member`;
         }
         createSSEConnection(url);
     } else {
@@ -840,6 +854,59 @@
         }
     }
 
+    async function getAdmittedRegion(): Promise<string | null> {
+        const dossierKeywords: string[] = await getStorageValue('dossierkeywords') || [];
+        const doNotMove: string[] = await getStorageValue('blockedregions') || [];
+
+        const ulElement = document.querySelector<HTMLUListElement>('#reports');
+        if (!ulElement) {
+            return null;
+        }
+
+        const listElements = Array.from(ulElement.querySelectorAll<HTMLLIElement>('li'))
+            .filter(li => li.textContent?.includes('admitted to the World Assembly'));
+
+        if (listElements.length == 0) {
+            return null; // No matching elements found 
+        }
+
+        for (const element of listElements) {
+            console.log(`checking: ${element}`);
+            // Inside this <li>, there are two <a> tags:
+            //    [0] => The nation link (e.g. "/nation=oathaastealre")
+            //    [1] => The region link
+            const anchors = element.querySelectorAll<HTMLAnchorElement>('a');
+
+            // Make sure we have at least 2 <a> tags
+            if (anchors.length < 2) {
+                return null; // Not enough anchors to match the pattern
+            }
+
+            // Ignore our own nation
+            const admittedNation = anchors[0].textContent?.trim() ?? null;
+            const myNation = document.querySelector('#current-wa-nation')?.textContent?.trim() ?? null;
+            if (admittedNation === myNation) {
+                continue; // Ignore our own nation
+            }
+
+            // if dossier inclusion is on and nation is not covered by it, skip
+            if (dossierKeywords.length &&
+                    (dossierKeywords.every((keyword) => admittedNation.indexOf(keyword) === -1))) {
+                continue;
+            }
+
+            const admittedRegion = anchors[1].textContent?.trim() ?? null;
+
+            if (doNotMove.indexOf(canonicalize(admittedRegion)) !== -1) {
+                continue;
+            }
+
+            return admittedRegion;
+        }
+
+        return null;
+    }
+
     function getMovedToRegion(): string | null {
         const ulElement = document.querySelector<HTMLUListElement>('#reports');
         if (!ulElement) {
@@ -911,7 +978,7 @@
     async function performChaseAction(): Promise<void>
     {
         const doNotMove: string[] = await getStorageValue('blockedregions') || [];
-        const moveRegion = getMovedToRegion();
+        const moveRegion = getMovedToRegion() || await getAdmittedRegion();
         
         if (moveRegion) {
             if (doNotMove.indexOf(canonicalize(moveRegion)) !== -1) {
@@ -994,7 +1061,7 @@
             });
         });
         
-        const moveRegion = getMovedToRegion();
+        const moveRegion = getMovedToRegion() || await getAdmittedRegion();
         if ((e.target as HTMLInputElement).value == 'Update Localid') {
             await manualLocalIdUpdate(e);
             (e.target as HTMLInputElement).value = 'Refresh';
@@ -1278,6 +1345,14 @@
         window.open(`/region=${regionUrl}`);
     }
 
+    async function toggleWorldAdmits(e: MouseEvent): Promise<void>
+    {
+        const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
+        chrome.storage.local.set({'trackworldmembers': !trackWorldMembers});
+        notyf.success(trackWorldMembers ? `Stopped tracking world admits.` : 'Started tracking world admits.');
+        (document.querySelector('#track-world-members') as HTMLInputElement).value = trackWorldMembers ? 'Track Admits' : 'Stop Tracking Admits';
+    }
+
     // Update the list of switchers as soon as a new WA admit page is opened
     // also update the EventSource whenever tracked nation changes
     function onStorageChange(changes: object): void
@@ -1324,7 +1399,7 @@
                 }
                 
                 // Debounce SSE reconnection to prevent 429 errors
-                sseReconnectTimeout = setTimeout(() => {
+                sseReconnectTimeout = setTimeout(async () => {
                     const myNation = document.querySelector('#current-wa-nation').innerHTML;
                     let url = `/api/nation:${myNation}+`;
                     
@@ -1333,11 +1408,41 @@
                     } else {
                         url += `nation:haku`;
                     }
+                    const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
+                    if (trackWorldMembers) {
+                        url += `+member`;
+                    }
                     
                     // Use the connection function with retry logic
                     createSSEConnection(url);
                     sseReconnectTimeout = null;
                 }, SSE_DEBOUNCE_DELAY); // Wait 2 seconds before reconnecting
+            }
+            else if (key === 'trackworldmembers') {
+                // Clear any existing reconnect timeout
+                if (sseReconnectTimeout) {
+                    clearTimeout(sseReconnectTimeout);
+                }
+                
+                const trackWorldMembers: boolean = storageChange.newValue || false;
+
+                sseReconnectTimeout = setTimeout(async () => {
+                    const myNation = document.querySelector('#current-wa-nation').innerHTML;
+                    let url = `/api/nation:${myNation}+`;
+                    // nation:{nation} for each nation
+                    const newTrackedNations: string[] = await getStorageValue('trackednations') || [];
+                    if (newTrackedNations.length > 0) {
+                        url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
+                    } else {
+                        // lol
+                        url += `nation:haku`;
+                    }
+                    if (trackWorldMembers) {
+                        url += `+member`;
+                    }
+                    createSSEConnection(url);
+                    sseReconnectTimeout = null;
+                }, SSE_DEBOUNCE_DELAY);
             }
         }
     }
@@ -1371,6 +1476,7 @@
             notyf.success(`Set SSE timeout to ${timeoutValue} seconds`);
         }
     });
+    document.querySelector('#track-world-members').addEventListener('click', toggleWorldAdmits);
     document.addEventListener('keyup', keyPress);
     chrome.storage.onChanged.addListener(onStorageChange);
 
@@ -1378,7 +1484,7 @@
      * Initialization
      */
 
-    chrome.storage.local.get(['switchers', 'currentwa', 'occupationmode', 'occupationsequence'], (result) =>
+    chrome.storage.local.get(['switchers', 'currentwa', 'occupationmode', 'occupationsequence', 'trackworldmembers'], (result) =>
     {
         try {
             document.querySelector('#num-switchers').innerHTML = result.switchers.length as string;
@@ -1391,8 +1497,10 @@
         
         const occupationStatus = document.querySelector('#occupation-status');
         const occupationSequence = document.querySelector('#occupation-sequence');
+        const trackWorldMembers = document.querySelector<HTMLInputElement>('#track-world-members');
         occupationStatus.innerHTML = result.occupationmode ? 'Enabled' : 'Disabled';
         occupationSequence.innerHTML = result.occupationsequence || 'Ready';
+        trackWorldMembers.value = result.trackworldmembers ? 'Stop Tracking Admits' : 'Track Admits';
 
         if (!(result.occupationmode)) {
             document.querySelectorAll('.occupation-mode-toggle').forEach((element) =>
