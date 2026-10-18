@@ -167,6 +167,7 @@
     interface EventPattern {
         regex: RegExp;
         format: (matches: RegExpMatchArray, buckets: string[]) => string;
+        filter: (matches: RegExpMatchArray, currentWA: string, trackedNations: string[]) => Promise<boolean>;
         // Add optional handler for additional processing
         handler?: (matches: RegExpMatchArray) => void;
     }
@@ -185,6 +186,9 @@
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
             format: (matches, _) => formatLink(matches[1], 'nation') +
                 ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            },
             handler: async (matches) => {
                 // (document.querySelector('#chasing-button') as HTMLInputElement).setAttribute('data-moveregion', matches[3]);
                 await playMoveSuccessSound();
@@ -193,22 +197,45 @@
         ADMISSION: {
             regex: /@@([^@]+)@@ was admitted to the World Assembly/,
             format: (matches, buckets) => `${formatLink(matches[1], 'nation')} was admitted to the World Assembly in ${formatLink(extractRegion(buckets), 'region')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
+                return trackWorldMembers || matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            },
         },
         ENDORSEMENT: {
             regex: /@@([^@]+)@@ endorsed @@([^@]+)@@/,
-            format: (matches, _) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                return matches[1] == currentWA 
+                    || trackedNations.indexOf(matches[1]) !== -1
+                    || matches[2] == currentWA
+                    || trackedNations.indexOf(matches[2]) !== -1;
+            },
         },
         WITHDRAW_ENDORSEMENT: {
             regex: /@@([^@]+)@@ withdrew its endorsement from @@([^@]+)@@/,
-            format: (matches, _) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                return matches[1] == currentWA 
+                    || trackedNations.indexOf(matches[1]) !== -1
+                    || matches[2] == currentWA
+                    || trackedNations.indexOf(matches[2]) !== -1;
+            },
         },
         RESIGN_WA: {
             regex: /@@([^@]+)@@ resigned from the World Assembly/,
-            format: (matches, _) => `${formatLink(matches[1], 'nation')} resigned from the World Assembly`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} resigned from the World Assembly`,
+            filter: async (matches, currentWA, trackedNations) => {
+                const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
+                return trackWorldMembers || matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            },
         },
         INFLUENCE: {
             regex: /@@([^@]+)@@'s influence in %%([^@]+)%% rose from "[^@]+" to "[^@]+"/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            },
             handler: async (matches) => {
                 // Check if this is the current WA nation updating
                 const updatedNation = matches[1];
@@ -232,7 +259,10 @@
         },
         WA_DELEGATE: {
             regex: /@@([^@]+)@@ became WA Delegate of %%([^%]+)%%/,
-            format: (matches, _) => `${formatLink(matches[1], 'nation')} became WA Delegate of ${formatLink(matches[2], 'region')}`
+            format: (matches, _) => `${formatLink(matches[1], 'nation')} became WA Delegate of ${formatLink(matches[2], 'region')}`,
+            filter: async (matches, currentWA, trackedNations) => {
+                return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            },
         }
     };
 
@@ -283,11 +313,13 @@
     const handleEventMessage = async (event: MessageEvent): Promise<void> => {
         try {
             const data = JSON.parse(event.data) as EventData;
+            const currentWA = await getStorageValue('currentwa');
+            const trackedNations: string[] = (await getStorageValue('trackednations')) || [];
 
             // Try each pattern until we find a match
             for (const pattern of Object.values(eventPatterns)) {
                 const match = data.str.match(pattern.regex);
-                if (match) {
+                if (match && await pattern.filter(match, currentWA, trackedNations)) {
                     const reportElement = appendReport(pattern.format(match, data.buckets));
                     // Move region handler
                     if (pattern.handler) {
@@ -411,20 +443,7 @@
 
     // Set up initial event source
     if (typeof EventSource !== 'undefined') {
-        const myNation = await getStorageValue('currentwa');
-        let url = `/api/nation:${myNation}+`;
-        // nation:{nation} for each nation
-        const newTrackedNations: string[] = await getStorageValue('trackednations') || [];
-        if (newTrackedNations.length > 0) {
-            url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
-        } else {
-            // lol
-            url += `nation:haku`;
-        }
-        const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
-        if (trackWorldMembers) {
-            url += `+member`;
-        }
+        const url = `/api/move+member+change+endo`;
         createSSEConnection(url);
     } else {
         console.error('EventSource is not supported in this browser');
@@ -871,7 +890,6 @@
         }
 
         for (const element of listElements) {
-            console.log(`checking: ${element}`);
             // Inside this <li>, there are two <a> tags:
             //    [0] => The nation link (e.g. "/nation=oathaastealre")
             //    [1] => The region link
@@ -1354,7 +1372,6 @@
     }
 
     // Update the list of switchers as soon as a new WA admit page is opened
-    // also update the EventSource whenever tracked nation changes
     function onStorageChange(changes: object): void
     {
         for (let key in changes) {
@@ -1374,11 +1391,6 @@
                 occupationSequence.innerHTML = storageChange.newValue;
             }
             else if (key === 'trackednations') {
-                // Clear any existing reconnect timeout
-                if (sseReconnectTimeout) {
-                    clearTimeout(sseReconnectTimeout);
-                }
-                
                 const newTrackedNations: string[] = storageChange.newValue || [];
                 const addedCount = newTrackedNations.length - (nationsTracked?.length || 0);
                 
@@ -1393,56 +1405,10 @@
                         if (addedCount === 1) {
                             // Keep the specific nation tracking message from the button click
                         } else {
-                            status.innerHTML = `Tracking ${addedCount} new nations. Updates starting soon...`;
+                            status.innerHTML = `Tracking ${addedCount} new nations.`;
                         }
                     }
                 }
-                
-                // Debounce SSE reconnection to prevent 429 errors
-                sseReconnectTimeout = setTimeout(async () => {
-                    const myNation = document.querySelector('#current-wa-nation').innerHTML;
-                    let url = `/api/nation:${myNation}+`;
-                    
-                    if (newTrackedNations.length > 0) {
-                        url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
-                    } else {
-                        url += `nation:haku`;
-                    }
-                    const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
-                    if (trackWorldMembers) {
-                        url += `+member`;
-                    }
-                    
-                    // Use the connection function with retry logic
-                    createSSEConnection(url);
-                    sseReconnectTimeout = null;
-                }, SSE_DEBOUNCE_DELAY); // Wait 2 seconds before reconnecting
-            }
-            else if (key === 'trackworldmembers') {
-                // Clear any existing reconnect timeout
-                if (sseReconnectTimeout) {
-                    clearTimeout(sseReconnectTimeout);
-                }
-                
-                const trackWorldMembers: boolean = storageChange.newValue || false;
-
-                sseReconnectTimeout = setTimeout(async () => {
-                    const myNation = document.querySelector('#current-wa-nation').innerHTML;
-                    let url = `/api/nation:${myNation}+`;
-                    // nation:{nation} for each nation
-                    const newTrackedNations: string[] = await getStorageValue('trackednations') || [];
-                    if (newTrackedNations.length > 0) {
-                        url += newTrackedNations.map((nation) => `nation:${nation}`).join('+');
-                    } else {
-                        // lol
-                        url += `nation:haku`;
-                    }
-                    if (trackWorldMembers) {
-                        url += `+member`;
-                    }
-                    createSSEConnection(url);
-                    sseReconnectTimeout = null;
-                }, SSE_DEBOUNCE_DELAY);
             }
         }
     }
