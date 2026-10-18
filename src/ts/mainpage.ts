@@ -636,7 +636,7 @@
             if (result.endorsekeywords)
                 endorseKeywords = result.endorsekeywords;
             const maxHappeningsCount = Number(result.endorsehappeningscount) || 10;
-            const jumpPoint = result.jumppoint || 'artificial_solar_system';
+            const jumpPoint = result.jumppoint || 'eta';
 
             const apiResponse = await fetchWithRateLimit(`/cgi-bin/api.cgi?q=happenings;view=region.${jumpPoint};filter=move+member+endo`, {}, clickedButton);
             const apiText = await apiResponse.text();

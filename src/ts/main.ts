@@ -104,7 +104,7 @@ async function setStorageValue(key: string, value: any): Promise<void>
 async function setDefaultStorageValues(): Promise<void>
 {
     const defaultValues: { key: string, value: any }[] = [
-        { key: 'jumppoint', value: 'artificial_solar_system' },
+        { key: 'jumppoint', value: 'eta' },
         { key: 'roname', value: 'Reliant' },
         { key: 'blockedregions', value: [] },
         { key: 'dossierkeywords', value: [] },
@@ -327,7 +327,7 @@ chrome.storage.local.get('jpkey', (result) =>
     chrome.storage.local.get('jumppoint', (jpresult) =>
     {
         const jpKey = result.jpkey || 'V';
-        const jumpPoint = jpresult.jumppoint || 'artificial_solar_system';
+        const jumpPoint = jpresult.jumppoint || 'eta';
         keys[jpKey] = () =>
         {
             const moveButton: HTMLButtonElement = document.querySelector('button[name=move_region]');
