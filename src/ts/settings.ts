@@ -125,6 +125,18 @@ a dossier button on the main page. Useful for chasing specific teams. <b>Leave b
 <p>Current: <b id="current-occupation-mode">Disabled</b></p>
 </fieldset>
 <fieldset>
+<legend>Reports Filtering</legend>
+<p>When enabled, the following happening types will not show up in the Reports view.</p>
+<input type="checkbox" id="self-endo-hide-toggle">
+<label for="self-endo-hide-toggle">Endorsements (Self)</label>
+<input type="checkbox" id="other-endo-hide-toggle">
+<label for="other-endo-hide-toggle">Endorsements (Tracked)</label>
+<input type="checkbox" id="admit-hide-toggle">
+<label for="admit-hide-toggle">Blocked Admits</label>
+<input type="checkbox" id="move-hide-toggle">
+<label for="move-hide-toggle">Blocked Moves</label>
+</fieldset>
+<fieldset>
 <legend>Move Success Sound</legend>
 <p>When enabled, a notification sound will play when you successfully move to a different region.</p>
 <input type="checkbox" id="move-sound-toggle" checked>
@@ -287,6 +299,10 @@ document.querySelector('#new-custom-sound').addEventListener('change', loadCusto
 document.querySelector('#test-custom-sound').addEventListener('click', testCustomSound);
 document.querySelector('#set-custom-sound').addEventListener('click', setCustomSound);
 document.querySelector('#unset-custom-sound').addEventListener('click', unsetCustomSound);
+document.querySelector('#self-endo-hide-toggle').addEventListener('click', async (e) => { await toggleHidden('selfEndosHidden', e) });
+document.querySelector('#other-endo-hide-toggle').addEventListener('click', async (e) => { await toggleHidden('otherEndosHidden', e) });
+document.querySelector('#admit-hide-toggle').addEventListener('click', async (e) => { await toggleHidden('admitsHidden', e) });
+document.querySelector('#move-hide-toggle').addEventListener('click', async (e) => { await toggleHidden('movesHidden', e) });
 
 /*
  * Handlers
@@ -545,6 +561,12 @@ async function toggleOccupationMode(e: Event): Promise<void>
     notyf.success(`Occupation mode ${isEnabled ? 'enabled' : 'disabled'}`);
 }
 
+async function toggleHidden(key: string, e: Event): Promise<void>
+{
+    const isEnabled = (e.target as HTMLInputElement).checked;
+    await setStorageValue(key, isEnabled);
+}
+
 async function toggleMoveSound(e: Event): Promise<void>
 {
     const isEnabled = (e.target as HTMLInputElement).checked;
@@ -720,7 +742,11 @@ chrome.storage.local.get('switchers', (result) => {
             getCurrentKey('moveSoundEnabled'),
             getCurrentKey('moveSoundVolume'),
             getCurrentKey('customMoveSound'),
-            getCurrentKey('loginlandingpage')
+            getCurrentKey('loginlandingpage'),
+            getCurrentKey('selfEndosHidden'),
+            getCurrentKey('otherEndosHidden'),
+            getCurrentKey('admitsHidden'),
+            getCurrentKey('movesHidden'),
         ]);
 
         (document.querySelector('#new-main-nation') as HTMLInputElement).value = currentSettings[0];
@@ -734,6 +760,10 @@ chrome.storage.local.get('switchers', (result) => {
         const moveSoundVolume = currentSettings[8] ?? 50;
         const customMoveSound = currentSettings[9];
         const loginLandingPage = normalizeLandingPage(currentSettings[10]) || 'page=un';
+        const selfEndosHidden = currentSettings[11] ?? false;
+        const otherEndosHidden = currentSettings[12] ?? false;
+        const admitsHidden = currentSettings[13] ?? false;
+        const movesHidden = currentSettings[14] ?? false;
         
         for (let i = 0; i !== blockedRegions.length; i++)
             document.querySelector('#current-blocked-regions').innerHTML += `${blockedRegions[i]}<br>`;
@@ -756,6 +786,11 @@ chrome.storage.local.get('switchers', (result) => {
 
         (document.querySelector('#login-landing-page') as HTMLInputElement).value = loginLandingPage;
         document.querySelector('#current-login-landing-page').innerHTML = loginLandingPage;
+
+        (document.querySelector('#self-endo-hide-toggle') as HTMLInputElement).checked = Boolean(selfEndosHidden);
+        (document.querySelector('#other-endo-hide-toggle') as HTMLInputElement).checked = Boolean(otherEndosHidden);
+        (document.querySelector('#admit-hide-toggle') as HTMLInputElement).checked = Boolean(admitsHidden);
+        (document.querySelector('#move-hide-toggle') as HTMLInputElement).checked = Boolean(movesHidden);
     }
 
     await displayCurrentKeys();

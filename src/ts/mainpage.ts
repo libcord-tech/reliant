@@ -167,7 +167,7 @@
     interface EventPattern {
         regex: RegExp;
         format: (matches: RegExpMatchArray, buckets: string[]) => string;
-        filter: (matches: RegExpMatchArray, currentWA: string, trackedNations: string[]) => Promise<boolean>;
+        filter: (matches: RegExpMatchArray, buckets: string[], currentWA: string, trackedNations: string[]) => Promise<boolean>;
         // Add optional handler for additional processing
         handler?: (matches: RegExpMatchArray) => void;
     }
@@ -189,8 +189,26 @@
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
             format: (matches, _) => formatLink(matches[1], 'nation') +
                 ` moved from ${formatLink(matches[2], 'region')} to ${formatLink(matches[3], 'region')}`,
-            filter: async (matches, currentWA, trackedNations) => {
-                return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+            filter: async (matches, _, currentWA, trackedNations) => {
+                if (matches[1] == currentWA)
+                    return true;
+                if (trackedNations.indexOf(matches[1]) !== -1) {
+                    const movesHidden = await getStorageValue('movesHidden') || false;
+                    if (movesHidden) {
+                        const dossierKeywords: string[] = await getStorageValue('dossierkeywords') || [];
+                        const doNotMove: string[] = await getStorageValue('blockedregions') || [];
+
+                        if (dossierKeywords.length &&
+                                (dossierKeywords.every((keyword) => matches[1].indexOf(keyword) === -1))) {
+                            return false;
+                        }
+                        if (doNotMove.indexOf(canonicalize(matches[2])) !== -1) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
             },
             handler: async (matches) => {
                 // (document.querySelector('#chasing-button') as HTMLInputElement).setAttribute('data-moveregion', matches[3]);
@@ -200,25 +218,48 @@
         ADMISSION: {
             regex: /@@([^@]+)@@ was admitted to the World Assembly/,
             format: (matches, buckets) => `${formatLink(matches[1], 'nation')} was admitted to the World Assembly in ${formatLink(extractRegion(buckets), 'region')}`,
-            filter: async (matches, currentWA, trackedNations) => {
+            filter: async (matches, buckets, currentWA, trackedNations) => {
+                if (matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1)
+                    return true;
                 const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
-                return trackWorldMembers || matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
+                const admitsHidden = await getStorageValue('admitsHidden') || false;
+                if (trackWorldMembers) {
+                    if (admitsHidden) {
+                        const dossierKeywords: string[] = await getStorageValue('dossierkeywords') || [];
+                        const doNotMove: string[] = await getStorageValue('blockedregions') || [];
+
+                        if (dossierKeywords.length &&
+                                (dossierKeywords.every((keyword) => matches[1].indexOf(keyword) === -1))) {
+                            return false;
+                        }
+                        if (doNotMove.indexOf(canonicalize(extractRegion(buckets))) !== -1) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
             },
         },
         ENDORSEMENT: {
             regex: /@@([^@]+)@@ endorsed @@([^@]+)@@/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} endorsed ${formatLink(matches[2], 'nation')}`,
-            filter: async (matches, currentWA, trackedNations) => {
-                return matches[1] == currentWA 
-                    || trackedNations.indexOf(matches[1]) !== -1
-                    || matches[2] == currentWA
-                    || trackedNations.indexOf(matches[2]) !== -1;
+            filter: async (matches, _, currentWA, trackedNations) => {
+                if (matches[1] == currentWA || matches[2] == currentWA) {
+                    const selfEndosHidden = await getStorageValue('selfEndosHidden') || false;
+                    return !selfEndosHidden;
+                }
+                if (trackedNations.indexOf(matches[1]) !== -1 || trackedNations.indexOf(matches[2]) !== -1) {
+                    const otherEndosHidden = await getStorageValue('otherEndosHidden') || false;
+                    return !otherEndosHidden;
+                }
+                return false;
             },
         },
         WITHDRAW_ENDORSEMENT: {
             regex: /@@([^@]+)@@ withdrew its endorsement from @@([^@]+)@@/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} withdrew its endorsement from ${formatLink(matches[2], 'nation')}`,
-            filter: async (matches, currentWA, trackedNations) => {
+            filter: async (matches, _, currentWA, trackedNations) => {
                 return matches[1] == currentWA 
                     || trackedNations.indexOf(matches[1]) !== -1
                     || matches[2] == currentWA
@@ -228,7 +269,7 @@
         RESIGN_WA: {
             regex: /@@([^@]+)@@ resigned from the World Assembly/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} resigned from the World Assembly`,
-            filter: async (matches, currentWA, trackedNations) => {
+            filter: async (matches, _, currentWA, trackedNations) => {
                 const trackWorldMembers: boolean = await getStorageValue('trackworldmembers') || false;
                 return trackWorldMembers || matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
             },
@@ -236,7 +277,7 @@
         INFLUENCE: {
             regex: /@@([^@]+)@@'s influence in %%([^@]+)%% rose from "[^@]+" to "[^@]+"/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} updated in ${formatLink(matches[2], 'region')}`,
-            filter: async (matches, currentWA, trackedNations) => {
+            filter: async (matches, _, currentWA, trackedNations) => {
                 return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
             },
             handler: async (matches) => {
@@ -263,7 +304,7 @@
         WA_DELEGATE: {
             regex: /@@([^@]+)@@ became WA Delegate of %%([^%]+)%%/,
             format: (matches, _) => `${formatLink(matches[1], 'nation')} became WA Delegate of ${formatLink(matches[2], 'region')}`,
-            filter: async (matches, currentWA, trackedNations) => {
+            filter: async (matches, _, currentWA, trackedNations) => {
                 return matches[1] == currentWA || trackedNations.indexOf(matches[1]) !== -1;
             },
         }
@@ -327,7 +368,7 @@
             // Try each pattern until we find a match
             for (const pattern of Object.values(eventPatterns)) {
                 const match = data.str.match(pattern.regex);
-                if (match && await pattern.filter(match, currentWA, trackedNations)) {
+                if (match && await pattern.filter(match, data.buckets, currentWA, trackedNations)) {
                     const reportElement = appendReport(pattern.format(match, data.buckets));
                     // Move region handler
                     if (pattern.handler) {
