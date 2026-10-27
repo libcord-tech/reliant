@@ -924,77 +924,40 @@
         }
     }
 
-    async function getAdmittedRegion(): Promise<string | null> {
+    async function fetchAdmittedRegion(element: HTMLLIElement): Promise<string | null> {
         const dossierKeywords: string[] = await getStorageValue('dossierkeywords') || [];
-        const doNotMove: string[] = await getStorageValue('blockedregions') || [];
 
-        const ulElement = document.querySelector<HTMLUListElement>('#reports');
-        if (!ulElement) {
+        const anchors = element.querySelectorAll<HTMLAnchorElement>('a');
+
+        // Make sure we have at least 2 <a> tags
+        if (anchors.length < 2) {
+            return null; // Not enough anchors to match the pattern
+        }
+
+        // Ignore our own nation
+        const admittedNation = anchors[0].textContent?.trim() ?? null;
+        const myNation = document.querySelector('#current-wa-nation')?.textContent?.trim() ?? null;
+        if (admittedNation === myNation) {
             return null;
         }
 
-        const listElements = Array.from(ulElement.querySelectorAll<HTMLLIElement>('li'))
-            .filter(li => li.textContent?.includes('admitted to the World Assembly'));
-
-        if (listElements.length == 0) {
-            return null; // No matching elements found 
+        // if dossier inclusion is on and nation is not covered by it, skip
+        if (dossierKeywords.length &&
+                (dossierKeywords.every((keyword) => admittedNation.indexOf(keyword) === -1))) {
+            return null;
         }
 
-        for (const element of listElements) {
-            // Inside this <li>, there are two <a> tags:
-            //    [0] => The nation link (e.g. "/nation=oathaastealre")
-            //    [1] => The region link
-            const anchors = element.querySelectorAll<HTMLAnchorElement>('a');
+        const admittedRegion = anchors[1].textContent?.trim() ?? null;
 
-            // Make sure we have at least 2 <a> tags
-            if (anchors.length < 2) {
-                return null; // Not enough anchors to match the pattern
-            }
-
-            // Ignore our own nation
-            const admittedNation = anchors[0].textContent?.trim() ?? null;
-            const myNation = document.querySelector('#current-wa-nation')?.textContent?.trim() ?? null;
-            if (admittedNation === myNation) {
-                continue; // Ignore our own nation
-            }
-
-            // if dossier inclusion is on and nation is not covered by it, skip
-            if (dossierKeywords.length &&
-                    (dossierKeywords.every((keyword) => admittedNation.indexOf(keyword) === -1))) {
-                continue;
-            }
-
-            const admittedRegion = anchors[1].textContent?.trim() ?? null;
-
-            if (doNotMove.indexOf(canonicalize(admittedRegion)) !== -1) {
-                continue;
-            }
-
-            return admittedRegion;
-        }
-
-        return null;
+        return admittedRegion;
     }
 
-    function getMovedToRegion(): string | null {
-        const ulElement = document.querySelector<HTMLUListElement>('#reports');
-        if (!ulElement) {
-            return null;
-        }
-
-        // 2. Find the first LI containing "moved from".
-        const targetLi = Array.from(ulElement.querySelectorAll<HTMLLIElement>('li'))
-            .find(li => li.textContent?.includes('moved from'));
-
-        if (!targetLi) {
-            return null; // No matching LI found
-        }
-
-        // 3. Inside this <li>, there are three <a> tags in the example:
+    function fetchMovedToRegion(element: HTMLLIElement): string | null {
+        // Inside this <li>, there are three <a> tags in the example:
         //    [0] => The nation link (e.g. "/nation=oathaastealre")
         //    [1] => The "moved from" region link (e.g. "/region=look_away")
         //    [2] => The "moved to" region link (e.g. "/region=kaisereich")
-        const anchors = targetLi.querySelectorAll<HTMLAnchorElement>('a');
+        const anchors = element.querySelectorAll<HTMLAnchorElement>('a');
 
         // Make sure we have at least 3 <a> tags
         if (anchors.length < 3) {
@@ -1012,6 +975,27 @@
         const movedToRegion = anchors[2].textContent?.trim() ?? null;
 
         return movedToRegion;
+    }
+
+    async function getRegionToChaseTo(): Promise<string | null> {
+        const ulElement = document.querySelector<HTMLUListElement>('#reports');
+        if (!ulElement) {
+            return null;
+        }
+
+        const targetLi = Array.from(ulElement.querySelectorAll<HTMLLIElement>('li'))
+            .find(li => li.textContent?.includes('moved from')
+                     || li.textContent?.includes('admitted to the World Assembly'));
+
+        if (!targetLi) {
+            return null; // No matching LI found
+        }
+
+        if (targetLi.textContent?.includes('admitted to the World Assembly')) {
+            return await fetchAdmittedRegion(targetLi);
+        } else {
+            return fetchMovedToRegion(targetLi);
+        }
     }
 
     async function updateOccupationSequence(newSequence: string): Promise<void>
@@ -1047,7 +1031,7 @@
     async function performChaseAction(): Promise<void>
     {
         const doNotMove: string[] = await getStorageValue('blockedregions') || [];
-        const moveRegion = getMovedToRegion() || await getAdmittedRegion();
+        const moveRegion = await getRegionToChaseTo();
         
         if (moveRegion) {
             if (doNotMove.indexOf(canonicalize(moveRegion)) !== -1) {
@@ -1130,7 +1114,7 @@
             });
         });
         
-        const moveRegion = getMovedToRegion() || await getAdmittedRegion();
+        const moveRegion = await getRegionToChaseTo();
         if ((e.target as HTMLInputElement).value == 'Update Localid') {
             await manualLocalIdUpdate(e);
             (e.target as HTMLInputElement).value = 'Refresh';
