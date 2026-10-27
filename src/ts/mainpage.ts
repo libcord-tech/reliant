@@ -180,7 +180,10 @@
         return "[unknown]";
     }
 
-// Event patterns configuration
+    // Track timeout for updated nation highlighting
+    let updHighlightTimeout: number | null = null;
+
+    // Event patterns configuration
     const eventPatterns: Record<string, EventPattern> = {
         RELOCATION: {
             regex: /@@([^@]+)@@ relocated from %%([^%]+)%% to %%([^%]+)%%/,
@@ -249,7 +252,7 @@
                         // Add red pulse animation
                         currentWAElement.classList.add('highlight-update');
                         // After animation, switch to green highlight
-                        setTimeout(() => {
+                        updHighlightTimeout = setTimeout(() => {
                             currentWAElement.classList.remove('highlight-update');
                             currentWAElement.classList.add('highlight-active');
                         }, 2000); // Match the pulse animation duration
@@ -282,6 +285,11 @@
         if (naHighlightTimeout) {
             clearTimeout(naHighlightTimeout);
             naHighlightTimeout = null;
+        }
+
+        if (updHighlightTimeout) {
+            clearTimeout(updHighlightTimeout);
+            updHighlightTimeout = null;
         }
         
         // Remove all highlight classes first
